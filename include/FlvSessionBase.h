@@ -12,12 +12,9 @@
 #include "Stream.h"
 #include "StreamCenter.h"
 
-static const int FlushNum = 3;
-static const int FlushBufferSize = 1024 * 4;
-
 class FlvSessionBase: public TcpSession {
 public:
-    FlvSessionBase();
+    explicit FlvSessionBase(int bufferChunkSize);
     virtual void writeFlv(shared_ptr<vector<unsigned char>> tag);
     virtual void writeFlvHead();
     void addSink();
@@ -32,15 +29,16 @@ protected:
     void parseTag();
 protected:
     bool isSource;
-    std::atomic<bool> isPlay;
-    std::atomic<bool> isVideo;
-    std::atomic<bool> isAVC;
-    std::atomic<bool> isAAC;
+    bool isVideo;
+    bool isAVC;
+    bool isAAC;
     int flvStatus;
     int count;
     int lastCount;
-    int flushNum;
+    int currNum;
     int frameNum;
+    int flushNum;
+    int flushBufferSize;
     unsigned int flvSize;
     string streamName;
     string app;
@@ -50,8 +48,10 @@ protected:
     shared_ptr<Ping> ping;
     shared_ptr<FlvSessionBase> sourceSession;
     shared_ptr<vector<unsigned char>> temTag;
+    unordered_set<shared_ptr<FlvSessionBase>> waitPlay;
     unordered_set<shared_ptr<FlvSessionBase>> sinkManager;
     RwLock rwLock;
+    Mutex mutex;
 };
 
 

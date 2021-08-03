@@ -1,0 +1,36 @@
+{
+  "system": {
+    "obj_pool": {
+      "chunk_size": 200
+    },
+    "my_sql": {
+      "init_conn_num": 10,
+      "max_conn_num": 100,
+      "check_time": [0, 0, 1, 0]
+    },
+    "net": {
+      "read_buffer_chunk_size": 16384,
+      "listener": {
+        "max_epoll_task_num": 10,
+        "check_time": 1000,
+        "listen_num": 500,
+        "epoll_session_num": 1000
+      }
+    },
+    "task_system": {
+      "init_thread_num": 10,
+      "max_thread_num": 30,
+      "increase_task_num": 10,
+      "check_time": [0, 0, 1, 0]
+    },
+    "log": {
+      "path": "../log/log.log",
+      "rank": 3,
+      "check_time": [0, 0, 0, 10]
+    }
+  },
+  "live_stream_write": {
+    "flush_num": 5,
+    "flush_buffer_size": 8192
+  }
+}

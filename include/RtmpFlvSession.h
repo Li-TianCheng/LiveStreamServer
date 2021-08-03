@@ -51,7 +51,7 @@ struct ChunkStreamHead {
 
 class RtmpFlvSession: public FlvSessionBase {
 public:
-    RtmpFlvSession();
+    RtmpFlvSession(int bufferChunkSize);
     ~RtmpFlvSession() override = default;
     void writeFlv(shared_ptr<vector<unsigned char>> tag) override;
     void writeFlvHead() override;

@@ -4,7 +4,8 @@
 
 #include "HttpFlvSession.h"
 
-HttpFlvSession::HttpFlvSession() : request(nullptr), status(0), chunked(false), chunkSize(0), tmpSize(0) {
+HttpFlvSession::HttpFlvSession(int bufferChunkSize) : request(nullptr), status(0), chunked(false), chunkSize(0), tmpSize(0),
+                                                      FlvSessionBase(bufferChunkSize), isPost(false) {
 
 }
 
@@ -17,12 +18,12 @@ void HttpFlvSession::handleReadDone(iter pos, size_t n) {
                 sink();
                 return;
             }
-            if (request->line["method"] == "POST") {
+            if (isPost) {
                 source(*(pos++));
             }
         }
     }
-    if (status == 8 && request->line["method"] == "GET") {
+    if (status == 8 && !isPost) {
         sink();
     }
     readDone(n);
@@ -96,6 +97,7 @@ void HttpFlvSession::parseHttpHead(const char &c) {
                     chunked = false;
                 }
                 parseStreamInfo(request->line["url"]);
+                isPost = request->line["method"] == "POST";
                 status = 8;
                 break;
             } else {

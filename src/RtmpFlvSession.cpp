@@ -4,9 +4,9 @@
 
 #include "RtmpFlvSession.h"
 
-RtmpFlvSession::RtmpFlvSession(): status(0), size(1536), chunkStatus(0), c1(ObjPool::allocate<vector<unsigned char>>()),
+RtmpFlvSession::RtmpFlvSession(int bufferChunkSize): status(0), size(1536), chunkStatus(0), c1(ObjPool::allocate<vector<unsigned char>>()),
                                   remoteChunkSize(128), remoteWindowAckSize(2500000), chunkSize(128), windowAckSize(2500000),
-                                  received(0), ackReceived(0){
+                                  received(0), ackReceived(0), FlvSessionBase(bufferChunkSize){
     c1->reserve(1536);
 }
 

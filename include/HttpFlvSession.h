@@ -12,7 +12,7 @@
 
 class HttpFlvSession : public FlvSessionBase {
 public:
-    HttpFlvSession();
+    HttpFlvSession(int bufferChunkSize);
     ~HttpFlvSession() override = default;
     void writeFlv(shared_ptr<vector<unsigned char>> tag) override;
     void writeFlvHead() override;
@@ -27,6 +27,7 @@ private:
     string key;
     int status;
     bool chunked;
+    bool isPost;
     size_t tmpSize;
     size_t chunkSize;
     shared_ptr<Http> request;
