@@ -9,6 +9,7 @@
 #include <string>
 #include <memory>
 #include <atomic>
+#include <jsoncpp/json/json.h>
 #include "my_pthread/include/RwLock.h"
 
 using std::unordered_map;
@@ -23,6 +24,7 @@ public:
     static void addStream(const string& vhost, const string& app, const string& streamName, shared_ptr<FlvSessionBase> stream);
     static void deleteStream(const string& vhost, const string& app, const string& streamName);
     static void updateSinkNum(int diff);
+    static Json::Value getStreamName();
     static int getSinkNum();
     static int getSourceNum();
 private:

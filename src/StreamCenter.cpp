@@ -52,3 +52,17 @@ int StreamCenter::getSinkNum() {
 int StreamCenter::getSourceNum() {
     return getStreamCenter().sourceNum;
 }
+
+Json::Value StreamCenter::getStreamName() {
+    Json::Value value;
+    getStreamCenter().rwLock.rdLock();
+    for (auto& vhost : getStreamCenter().streamCenter) {
+        for (auto& app : vhost.second) {
+            for (auto& stream : app.second) {
+                value[vhost.first][app.first].append(stream.first);
+            }
+        }
+    }
+    getStreamCenter().rwLock.unlock();
+    return value;
+}

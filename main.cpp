@@ -66,8 +66,16 @@ void frontPage(shared_ptr<Http> request, shared_ptr<Http> response) {
     file.close();
 }
 
-int main() {
-    modules::init();
+int main(int argc, char *argv[]) {
+    int opt;
+    string path;
+    const char *optString = "c:";
+    while ((opt = getopt(argc, argv, optString)) != -1) {
+        if (opt == 'c') {
+            path = optarg;
+        }
+    }
+    modules::init(path);
     auto server = ObjPool::allocate<TcpServer<HttpFlvSession>>();
     auto listener = ObjPool::allocate<Listener>();
     HttpServer apiServer(listener, 7070, IPV4);
