@@ -4,17 +4,22 @@
 
 #include "FlvSessionBase.h"
 
-FlvSessionBase::FlvSessionBase(int bufferChunkSize): isVideo(false), flvStatus(0), flvSize(0), sourceSession(nullptr), currNum(0), frameNum(0),
-                                  ping(nullptr), count(0), lastCount(0), isAVC(false), isSource(false), isAAC(false), flushNum(ConfigSystem::getConfig()["live_stream_write"]["flush_num"].asInt()),
-                                  flushBufferSize(ConfigSystem::getConfig()["live_stream_write"]["flush_buffer_size"].asInt()), TcpSession(bufferChunkSize) {
-    temTag = ObjPool::allocate<vector<unsigned char>>();
+FlvSessionBase::FlvSessionBase(bool isRtmp, int bufferChunkSize): isRtmp(isRtmp), sourceSession(nullptr), currNum(0), frameNum(0), flvStatus(0), flvSize(0), chunkSize(ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt()),
+                                  count(0), lastCount(0), isAVC(false), isSource(false), isAAC(false), flushNum(ConfigSystem::getConfig()["live_stream_server"]["flush_num"].asInt()),
+                                  flushBufferSize(ConfigSystem::getConfig()["live_stream_server"]["flush_buffer_size"].asInt()), TcpSession(bufferChunkSize) {
+    flvTemTag = ObjPool::allocate<vector<unsigned char>>();
+    rtmpTemTag = ObjPool::allocate<vector<unsigned char>>();
 }
 
 void FlvSessionBase::parseFlv(const char &c) {
     if (!waitPlay.empty()) {
         mutex.lock();
         for (auto& session : waitPlay) {
-            session->writeFlvHead();
+            if (session->isRtmp) {
+                session->writeRtmpHead();
+            } else {
+                session->writeFlvHead();
+            }
             std::ostringstream log;
             log << "vhost:" << vhost << " app:" << app << " streamName:" << streamName << " sink[" << session << "] play";
             LOG(Access, log.str());
@@ -27,30 +32,22 @@ void FlvSessionBase::parseFlv(const char &c) {
     }
     switch(flvStatus) {
         case 0: {
-            stream.head->push_back(c);
-            if (stream.head->size() == 13) {
-                isVideo = (*stream.head)[4] == 0x05;
-                flvStatus = 1;
-            }
-            break;
-        }
-        case 1: {
             stream.currTag->push_back(c);
-            temTag->push_back(c);
+            flvTemTag->push_back(c);
             if (stream.currTag->size() == 11) {
-                flvStatus = 2;
+                flvStatus = 1;
                 flvSize = (unsigned int)(*stream.currTag)[1] << 16 | (unsigned int)(*stream.currTag)[2] << 8 | (unsigned int)(*stream.currTag)[3];
                 flvSize += 4;
             }
             break;
         }
-        case 2: {
+        case 1: {
             stream.currTag->push_back(c);
-            temTag->push_back(c);
+            flvTemTag->push_back(c);
             flvSize--;
             if (flvSize == 0) {
                 parseTag();
-                flvStatus = 1;
+                flvStatus = 0;
             }
             break;
         }
@@ -61,17 +58,24 @@ void FlvSessionBase::parseFlv(const char &c) {
 void FlvSessionBase::parseTag() {
     count++;
     currNum++;
+    flvToRtmp(rtmpTemTag, stream.currTag);
     if (currNum == flushNum || ((*stream.currTag)[0] == 9 && (*stream.currTag)[11] >> 4 == 1)) {
         rwLock.rdLock();
         for (auto& session : sinkManager) {
-            session->writeFlv(temTag);
+            if (session->isRtmp) {
+                session->write(rtmpTemTag);
+            } else {
+                session->write(flvTemTag);
+            }
             session->count++;
         }
         rwLock.unlock();
         currNum = 0;
         frameNum = 0;
-        temTag = ObjPool::allocate<vector<unsigned char>>();
-        temTag->reserve(flushBufferSize);
+        flvTemTag = ObjPool::allocate<vector<unsigned char>>();
+        flvTemTag->reserve(flushBufferSize);
+        rtmpTemTag = ObjPool::allocate<vector<unsigned char>>();
+        rtmpTemTag->reserve(flushBufferSize);
     }
     switch((*stream.currTag)[0]) {
         case 8: {
@@ -125,10 +129,6 @@ void FlvSessionBase::parseTag() {
     stream.currTag->clear();
 }
 
-void FlvSessionBase::writeFlv(shared_ptr<vector<unsigned char>> tag) {
-
-}
-
 void FlvSessionBase::addSink() {
     if (sourceSession != nullptr) {
         StreamCenter::updateSinkNum(1);
@@ -139,8 +139,6 @@ void FlvSessionBase::addSink() {
 }
 
 void FlvSessionBase::sessionInit() {
-    ping = ObjPool::allocate<Ping>(*(sockaddr_in*)&address);
-    ping->send();
     uuid = addTicker(0, 0, 1, 0);
 }
 
@@ -152,7 +150,11 @@ void FlvSessionBase::sessionClear() {
         mutex.unlock();
         rwLock.wrLock();
         for (auto& session : sinkManager) {
-            session->writeFlv(temTag);
+            if (session->isRtmp) {
+                session->write(rtmpTemTag);
+            } else {
+                session->write(flvTemTag);
+            }
         }
         sinkManager.clear();
         rwLock.unlock();
@@ -178,15 +180,138 @@ void FlvSessionBase::sessionClear() {
 
 void FlvSessionBase::handleTickerTimeOut(const string &uuid) {
     if (this->uuid == uuid) {
-        if (!ping->recv() || lastCount == count) {
+        if (lastCount == count) {
             deleteSession();
         } else {
             lastCount = count;
-            ping->send();
         }
     }
 }
 
 void FlvSessionBase::writeFlvHead() {
+    auto head = ObjPool::allocate<vector<unsigned char>>();
+    head->push_back('F');
+    head->push_back('L');
+    head->push_back('V');
+    head->push_back(1);
+    head->push_back(5);
+    head->push_back(0);
+    head->push_back(0);
+    head->push_back(0);
+    head->push_back(9);
+    head->push_back(0);
+    head->push_back(0);
+    head->push_back(0);
+    head->push_back(0);
+    write(head);
+    write(sourceSession->stream.script);
+    if (sourceSession->isAAC) {
+        write(sourceSession->stream.aacTag);
+    }
+    if (sourceSession->isAVC) {
+        write(sourceSession->stream.avcTag);
+    }
+    for (int i = 0; i < (sourceSession->stream.idx-sourceSession->frameNum); i++) {
+        write(sourceSession->stream.gop[i]);
+    }
+}
 
+void FlvSessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr<vector<unsigned char>> tag) {
+    int csId;
+    if ((*tag)[0] == 8) {
+        csId = 4;
+    } else if ((*tag)[0] == 9) {
+        csId = 6;
+    }
+    int length = tag->size()-15;
+    unsigned int num = length / chunkSize;
+    int total = 0;
+    for (int i = 0; i <= num; i++) {
+        if (total == length) {
+            break;
+        }
+        if (i == 0) {
+            temTag->push_back(csId);
+            temTag->push_back((*tag)[4]);
+            temTag->push_back((*tag)[5]);
+            temTag->push_back((*tag)[6]);
+            temTag->push_back((length >> 16) & 0x0000ff);
+            temTag->push_back((length >> 8) & 0x0000ff);
+            temTag->push_back(length & 0x0000ff);
+            temTag->push_back((*tag)[0]);
+            temTag->push_back(1);
+            temTag->push_back(0);
+            temTag->push_back(0);
+            temTag->push_back(0);
+        } else {
+            temTag->push_back(csId | 0xc0);
+        }
+        int inc = chunkSize;
+        if (length - i*chunkSize <= inc) {
+            inc = length - i*chunkSize;
+        }
+        total += inc;
+        temTag->insert(temTag->end(), tag->begin()+i*chunkSize+11, tag->begin()+i*chunkSize+inc+11);
+    }
+}
+
+void FlvSessionBase::writeRtmpHead() {
+    auto chunk = ObjPool::allocate<vector<unsigned char>>();
+    int length = sourceSession->stream.script->size()+1;
+    unsigned int num = length / chunkSize;
+    int total = 0;
+    for (int i = 0; i <= num; i++) {
+        if (total == length) {
+            break;
+        }
+        if (i == 0) {
+            chunk->push_back(6);
+            chunk->push_back(0);
+            chunk->push_back(0);
+            chunk->push_back(0);
+            chunk->push_back((length >> 16) & 0x0000ff);
+            chunk->push_back((length >> 8) & 0x0000ff);
+            chunk->push_back(length & 0x0000ff);
+            chunk->push_back(18);
+            chunk->push_back(1);
+            chunk->push_back(0);
+            chunk->push_back(0);
+            chunk->push_back(0);
+            chunk->push_back(2);
+            chunk->push_back(0);
+            chunk->push_back(13);
+            chunk->push_back('@');
+            chunk->push_back('s');
+            chunk->push_back('e');
+            chunk->push_back('t');
+            chunk->push_back('D');
+            chunk->push_back('a');
+            chunk->push_back('t');
+            chunk->push_back('a');
+            chunk->push_back('F');
+            chunk->push_back('r');
+            chunk->push_back('a');
+            chunk->push_back('m');
+            chunk->push_back('e');
+            total += 16;
+        } else {
+            chunk->push_back(6 | 0xc0);
+        }
+        int inc = chunkSize;
+        if (length-16-i*chunkSize <= inc) {
+            inc = length-16- i*chunkSize;
+        }
+        total += inc;
+        chunk->insert(chunk->end(), sourceSession->stream.script->begin()+i*chunkSize+11, sourceSession->stream.script->begin()+i*chunkSize+inc+11);
+    }
+    if (sourceSession->isAAC) {
+        flvToRtmp(chunk, sourceSession->stream.aacTag);
+    }
+    if (sourceSession->isAVC) {
+        flvToRtmp(chunk, sourceSession->stream.avcTag);
+    }
+    for (int i = 0; i < (sourceSession->stream.idx-sourceSession->frameNum); i++) {
+        flvToRtmp(chunk, sourceSession->stream.gop[i]);
+    }
+    write(chunk);
 }

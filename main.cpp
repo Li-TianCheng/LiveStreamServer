@@ -3,7 +3,7 @@
 #include "Modules.h"
 #include "net/include/TcpServer.h"
 #include "HttpFlvSession.h"
-#include "RtmpFlvSession.h"
+#include "RtmpSession.h"
 #include "HttpApi.h"
 
 using namespace std;
@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
     }
     modules::init(path);
     auto server = ObjPool::allocate<TcpServer<HttpFlvSession>>();
+    auto rtmpServer = ObjPool::allocate<TcpServer<RtmpSession>>();
     auto listener = ObjPool::allocate<Listener>();
     HttpServer apiServer(listener, 7070, IPV4);
     apiServerInit(apiServer);
@@ -85,6 +86,7 @@ int main(int argc, char *argv[]) {
     httpServer.registerRegexHandler("/play\?.*", play);
     httpServer.registerRegexHandler("/resource/.*", getResource);
     listener->registerListener(8070, IPV4, server);
+    listener->registerListener(1935, IPV4, rtmpServer);
     listener->listen();
     modules::close();
     return 0;

@@ -14,40 +14,40 @@
 
 class FlvSessionBase: public TcpSession {
 public:
-    explicit FlvSessionBase(int bufferChunkSize);
-    virtual void writeFlv(shared_ptr<vector<unsigned char>> tag);
-    virtual void writeFlvHead();
+    explicit FlvSessionBase(bool isRtmp, int bufferChunkSize);
+    void writeFlvHead();
+    void writeRtmpHead();
     void addSink();
     void sessionInit() override;
     void sessionClear() override;
     void handleTickerTimeOut(const string &uuid) override;
     ~FlvSessionBase() override = default;
 protected:
-    friend class HttpFlvSession;
-    friend class RtmpFlvSession;
     void parseFlv(const char& c);
     void parseTag();
+    void flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr<vector<unsigned char>> tag);
 protected:
+    bool isRtmp;
     bool isSource;
-    bool isVideo;
     bool isAVC;
     bool isAAC;
-    int flvStatus;
     int count;
     int lastCount;
     int currNum;
     int frameNum;
     int flushNum;
     int flushBufferSize;
+    int flvStatus;
     unsigned int flvSize;
+    unsigned int chunkSize;
     string streamName;
     string app;
     string vhost;
     string uuid;
     Stream stream;
-    shared_ptr<Ping> ping;
     shared_ptr<FlvSessionBase> sourceSession;
-    shared_ptr<vector<unsigned char>> temTag;
+    shared_ptr<vector<unsigned char>> flvTemTag;
+    shared_ptr<vector<unsigned char>> rtmpTemTag;
     unordered_set<shared_ptr<FlvSessionBase>> waitPlay;
     unordered_set<shared_ptr<FlvSessionBase>> sinkManager;
     RwLock rwLock;

@@ -5,7 +5,7 @@
 #include "HttpFlvSession.h"
 
 HttpFlvSession::HttpFlvSession(int bufferChunkSize) : request(nullptr), status(0), chunked(false), chunkSize(0), tmpSize(0),
-                                                      FlvSessionBase(bufferChunkSize), isPost(false) {
+                                                      FlvSessionBase(false, bufferChunkSize), isPost(false), headSize(13) {
 
 }
 
@@ -138,8 +138,12 @@ void HttpFlvSession::sink() {
 void HttpFlvSession::source(const char &c) {
     if (chunked) {
         if (chunkSize != 0) {
-            parseFlv(c);
             chunkSize--;
+            if (headSize != 0) {
+                headSize--;
+            } else {
+                parseFlv(c);
+            }
         } else {
             if (c == '\r') {
                 return;
@@ -158,7 +162,11 @@ void HttpFlvSession::source(const char &c) {
             }
         }
     } else {
-        parseFlv(c);
+        if (headSize != 0) {
+            headSize--;
+        } else {
+            parseFlv(c);
+        }
     }
 }
 
@@ -183,24 +191,4 @@ void HttpFlvSession::writeHeader(shared_ptr<Http> response) {
     msg += "\r\n";
     auto m = ObjPool::allocate<string>(std::move(msg));
     write(m);
-}
-
-void HttpFlvSession::writeFlv(shared_ptr<vector<unsigned char>> tag) {
-    write(tag);
-}
-
-void HttpFlvSession::writeFlvHead() {
-    write(sourceSession->stream.head);
-    write(sourceSession->stream.script);
-    if (sourceSession->isAAC) {
-        write(sourceSession->stream.aacTag);
-    }
-    if (sourceSession->isAVC) {
-        write(sourceSession->stream.avcTag);
-    }
-    if (sourceSession->isVideo) {
-        for (int i = 0; i < (sourceSession->stream.idx-sourceSession->frameNum); i++) {
-            writeFlv(sourceSession->stream.gop[i]);
-        }
-    }
 }

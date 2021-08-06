@@ -29,8 +29,9 @@
       "check_time": [0, 0, 0, 10]
     }
   },
-  "live_stream_write": {
+  "live_stream_server": {
+    "rtmp_chunk_size": 4096,
     "flush_num": 5,
-    "flush_buffer_size": 8192
+    "flush_buffer_size": 32768
   }
 }
