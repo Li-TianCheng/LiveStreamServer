@@ -5,7 +5,7 @@
 #ifndef LIVESTREAMSERVER_RTMPSESSION_H
 #define LIVESTREAMSERVER_RTMPSESSION_H
 
-#include "FlvSessionBase.h"
+#include "SessionBase.h"
 
 struct ChunkStreamHead {
     unsigned int csId = 0;
@@ -17,7 +17,7 @@ struct ChunkStreamHead {
     unsigned int idx = 0;
 };
 
-class RtmpSession: public FlvSessionBase {
+class RtmpSession: public SessionBase {
 public:
     explicit RtmpSession(int bufferChunkSize);
     ~RtmpSession() override = default;

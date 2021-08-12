@@ -4,9 +4,9 @@
 
 #include "StreamCenter.h"
 
-shared_ptr<FlvSessionBase> StreamCenter::getStream(const string& vhost, const string& app, const string& streamName) {
+shared_ptr<SessionBase> StreamCenter::getStream(const string& vhost, const string& app, const string& streamName) {
     getStreamCenter().rwLock.rdLock();
-    shared_ptr<FlvSessionBase> stream = nullptr;
+    shared_ptr<SessionBase> stream = nullptr;
     if (getStreamCenter().streamCenter.find(vhost) != getStreamCenter().streamCenter.end()) {
         if (getStreamCenter().streamCenter[vhost].find(app) != getStreamCenter().streamCenter[vhost].end()) {
             if (getStreamCenter().streamCenter[vhost][app].find(streamName) != getStreamCenter().streamCenter[vhost][app].end()) {
@@ -18,7 +18,7 @@ shared_ptr<FlvSessionBase> StreamCenter::getStream(const string& vhost, const st
     return stream;
 }
 
-void StreamCenter::addStream(const string& vhost, const string& app, const string& streamName, shared_ptr<FlvSessionBase> stream) {
+void StreamCenter::addStream(const string& vhost, const string& app, const string& streamName, shared_ptr<SessionBase> stream) {
     getStreamCenter().rwLock.wrLock();
     getStreamCenter().sourceNum++;
     getStreamCenter().streamCenter[vhost][app][streamName] = stream;

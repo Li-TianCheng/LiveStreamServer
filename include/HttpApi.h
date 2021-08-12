@@ -7,7 +7,7 @@
 
 #include <jsoncpp/json/json.h>
 
-void getStreamInfo(shared_ptr<Http> request, shared_ptr<Http> response) {
+static void getStreamInfo(shared_ptr<Http> request, shared_ptr<Http> response) {
     Json::Value status;
     status["sink num"] = StreamCenter::getSinkNum();
     status["source num"] = StreamCenter::getSourceNum();
@@ -17,7 +17,7 @@ void getStreamInfo(shared_ptr<Http> request, shared_ptr<Http> response) {
     response->data = data;
 }
 
-void restart(shared_ptr<Http> request, shared_ptr<Http> response) {
+static void restart(shared_ptr<Http> request, shared_ptr<Http> response) {
     pid_t pid = getpid();
     string cmd = "ps -efc | grep " + std::to_string(pid);
     FILE* pp = ::popen(cmd.data(),"r");
@@ -36,7 +36,7 @@ void restart(shared_ptr<Http> request, shared_ptr<Http> response) {
     }
 }
 
-void getStreamName(shared_ptr<Http> request, shared_ptr<Http> response) {
+static void getStreamName(shared_ptr<Http> request, shared_ptr<Http> response) {
     Json::Value status = StreamCenter::getStreamName();
     vector<char> data;
     string s = status.toStyledString();
@@ -44,11 +44,11 @@ void getStreamName(shared_ptr<Http> request, shared_ptr<Http> response) {
     response->data = data;
 }
 
-void stop(shared_ptr<Http> request, shared_ptr<Http> response) {
+static void stop(shared_ptr<Http> request, shared_ptr<Http> response) {
     abort();
 }
 
-void getStatus(shared_ptr<Http> request, shared_ptr<Http> response) {
+static void getStatus(shared_ptr<Http> request, shared_ptr<Http> response) {
     pid_t pid = getpid();
     string filePath = "/proc/" + std::to_string(pid) + "/stat";
     char lastBuffer[1024];
@@ -87,7 +87,7 @@ void getStatus(shared_ptr<Http> request, shared_ptr<Http> response) {
     response->data = data;
 }
 
-void apiServerInit(HttpServer& apiServer) {
+static void apiServerInit(HttpServer& apiServer) {
     apiServer.registerHandler("/v1/stream/status", getStreamInfo);
     apiServer.registerHandler("/v1/stream/name", getStreamName);
     apiServer.registerHandler("/v1/server/restart", restart);

@@ -2,8 +2,8 @@
 // Created by ltc on 2021/7/25.
 //
 
-#ifndef LIVESTREAMSERVER_FLVSESSIONBASE_H
-#define LIVESTREAMSERVER_FLVSESSIONBASE_H
+#ifndef LIVESTREAMSERVER_SESSIONBASE_H
+#define LIVESTREAMSERVER_SESSIONBASE_H
 
 #include <sstream>
 #include "my_pthread/include/RwLock.h"
@@ -12,16 +12,16 @@
 #include "Stream.h"
 #include "StreamCenter.h"
 
-class FlvSessionBase: public TcpSession {
+class SessionBase: public TcpSession {
 public:
-    explicit FlvSessionBase(bool isRtmp, int bufferChunkSize);
+    explicit SessionBase(bool isRtmp, int bufferChunkSize);
     void writeFlvHead();
     void writeRtmpHead();
     void addSink();
     void sessionInit() override;
     void sessionClear() override;
     void handleTickerTimeOut(const string &uuid) override;
-    ~FlvSessionBase() override = default;
+    ~SessionBase() override = default;
 protected:
     void parseFlv(const char& c);
     void parseTag();
@@ -45,14 +45,14 @@ protected:
     string vhost;
     string uuid;
     Stream stream;
-    shared_ptr<FlvSessionBase> sourceSession;
+    shared_ptr<SessionBase> sourceSession;
     shared_ptr<vector<unsigned char>> flvTemTag;
     shared_ptr<vector<unsigned char>> rtmpTemTag;
-    unordered_set<shared_ptr<FlvSessionBase>> waitPlay;
-    unordered_set<shared_ptr<FlvSessionBase>> sinkManager;
+    unordered_set<shared_ptr<SessionBase>> waitPlay;
+    unordered_set<shared_ptr<SessionBase>> sinkManager;
     RwLock rwLock;
     Mutex mutex;
 };
 
 
-#endif //LIVESTREAMSERVER_FLVSESSIONBASE_H
+#endif //LIVESTREAMSERVER_SESSIONBASE_H

@@ -8,9 +8,9 @@
 #include "net/include/TcpSession.h"
 #include "http/include/HttpSession.h"
 #include "Stream.h"
-#include "FlvSessionBase.h"
+#include "SessionBase.h"
 
-class HttpFlvSession : public FlvSessionBase {
+class HttpFlvSession : public SessionBase {
 public:
     explicit HttpFlvSession(int bufferChunkSize);
     ~HttpFlvSession() override = default;

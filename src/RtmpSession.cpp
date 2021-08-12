@@ -6,7 +6,7 @@
 
 RtmpSession::RtmpSession(int bufferChunkSize): status(0), size(1536), chunkStatus(0), c1(ObjPool::allocate<vector<unsigned char>>()),
                                   remoteChunkSize(128), remoteWindowAckSize(2500000), chunkSize(128), windowAckSize(2500000),
-                                  received(0), ackReceived(0), FlvSessionBase(true, bufferChunkSize), extend(false) {
+                                  received(0), ackReceived(0), SessionBase(true, bufferChunkSize), extend(false) {
     c1->reserve(1536);
 }
 

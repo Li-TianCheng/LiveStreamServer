@@ -16,12 +16,12 @@ using std::unordered_map;
 using std::shared_ptr;
 using std::string;
 
-class FlvSessionBase;
+class SessionBase;
 
 class StreamCenter {
 public:
-    static shared_ptr<FlvSessionBase> getStream(const string& vhost, const string& app, const string& streamName);
-    static void addStream(const string& vhost, const string& app, const string& streamName, shared_ptr<FlvSessionBase> stream);
+    static shared_ptr<SessionBase> getStream(const string& vhost, const string& app, const string& streamName);
+    static void addStream(const string& vhost, const string& app, const string& streamName, shared_ptr<SessionBase> stream);
     static void deleteStream(const string& vhost, const string& app, const string& streamName);
     static void updateSinkNum(int diff);
     static Json::Value getStreamName();
@@ -34,7 +34,7 @@ private:
     std::atomic<int> sourceNum;
     std::atomic<int> sinkNum;
     RwLock rwLock;
-    unordered_map<string, unordered_map<string, unordered_map<string, shared_ptr<FlvSessionBase>>>> streamCenter;
+    unordered_map<string, unordered_map<string, unordered_map<string, shared_ptr<SessionBase>>>> streamCenter;
 };
 
 

@@ -2,16 +2,16 @@
 // Created by ltc on 2021/7/25.
 //
 
-#include "FlvSessionBase.h"
+#include "SessionBase.h"
 
-FlvSessionBase::FlvSessionBase(bool isRtmp, int bufferChunkSize): isRtmp(isRtmp), sourceSession(nullptr), currNum(0), frameNum(0), flvStatus(0), flvSize(0), chunkSize(ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt()),
+SessionBase::SessionBase(bool isRtmp, int bufferChunkSize): isRtmp(isRtmp), sourceSession(nullptr), currNum(0), frameNum(0), flvStatus(0), flvSize(0), chunkSize(ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt()),
                                   count(0), lastCount(0), isAVC(false), isSource(false), isAAC(false), flushNum(ConfigSystem::getConfig()["live_stream_server"]["flush_num"].asInt()),
                                   flushBufferSize(ConfigSystem::getConfig()["live_stream_server"]["flush_buffer_size"].asInt()), TcpSession(bufferChunkSize) {
     flvTemTag = ObjPool::allocate<vector<unsigned char>>();
     rtmpTemTag = ObjPool::allocate<vector<unsigned char>>();
 }
 
-void FlvSessionBase::parseFlv(const char &c) {
+void SessionBase::parseFlv(const char &c) {
     if (!waitPlay.empty()) {
         mutex.lock();
         for (auto& session : waitPlay) {
@@ -55,7 +55,7 @@ void FlvSessionBase::parseFlv(const char &c) {
     }
 }
 
-void FlvSessionBase::parseTag() {
+void SessionBase::parseTag() {
     count++;
     currNum++;
     flvToRtmp(rtmpTemTag, stream.currTag);
@@ -118,7 +118,7 @@ void FlvSessionBase::parseTag() {
                 break;
             }
             isSource = true;
-            StreamCenter::addStream(vhost, app, streamName, static_pointer_cast<FlvSessionBase>(shared_from_this()));
+            StreamCenter::addStream(vhost, app, streamName, static_pointer_cast<SessionBase>(shared_from_this()));
             std::ostringstream log;
             log << "vhost:" << vhost << " app:" << app << " streamName:" << streamName << " source[" << shared_from_this() << "] publish";
             LOG(Access, log.str());
@@ -129,20 +129,20 @@ void FlvSessionBase::parseTag() {
     stream.currTag->clear();
 }
 
-void FlvSessionBase::addSink() {
+void SessionBase::addSink() {
     if (sourceSession != nullptr) {
         StreamCenter::updateSinkNum(1);
         sourceSession->mutex.lock();
-        sourceSession->waitPlay.insert(static_pointer_cast<FlvSessionBase>(shared_from_this()));
+        sourceSession->waitPlay.insert(static_pointer_cast<SessionBase>(shared_from_this()));
         sourceSession->mutex.unlock();
     }
 }
 
-void FlvSessionBase::sessionInit() {
+void SessionBase::sessionInit() {
     uuid = addTicker(0, 0, 1, 0);
 }
 
-void FlvSessionBase::sessionClear() {
+void SessionBase::sessionClear() {
     if (isSource) {
         StreamCenter::deleteStream(vhost, app, streamName);
         mutex.lock();
@@ -165,10 +165,10 @@ void FlvSessionBase::sessionClear() {
         if (sourceSession != nullptr) {
             StreamCenter::updateSinkNum(-1);
             mutex.lock();
-            sourceSession->waitPlay.erase(static_pointer_cast<FlvSessionBase>(shared_from_this()));
+            sourceSession->waitPlay.erase(static_pointer_cast<SessionBase>(shared_from_this()));
             mutex.unlock();
             sourceSession->rwLock.wrLock();
-            sourceSession->sinkManager.erase(static_pointer_cast<FlvSessionBase>(shared_from_this()));
+            sourceSession->sinkManager.erase(static_pointer_cast<SessionBase>(shared_from_this()));
             sourceSession->rwLock.unlock();
             std::ostringstream log;
             log << "vhost:" << vhost << " app:" << app << " streamName:" << streamName << " sink[" << shared_from_this() << "] end";
@@ -178,7 +178,7 @@ void FlvSessionBase::sessionClear() {
     sourceSession = nullptr;
 }
 
-void FlvSessionBase::handleTickerTimeOut(const string &uuid) {
+void SessionBase::handleTickerTimeOut(const string &uuid) {
     if (this->uuid == uuid) {
         if (lastCount == count) {
             deleteSession();
@@ -188,7 +188,7 @@ void FlvSessionBase::handleTickerTimeOut(const string &uuid) {
     }
 }
 
-void FlvSessionBase::writeFlvHead() {
+void SessionBase::writeFlvHead() {
     auto head = ObjPool::allocate<vector<unsigned char>>();
     head->push_back('F');
     head->push_back('L');
@@ -216,7 +216,7 @@ void FlvSessionBase::writeFlvHead() {
     }
 }
 
-void FlvSessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr<vector<unsigned char>> tag) {
+void SessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr<vector<unsigned char>> tag) {
     int csId;
     if ((*tag)[0] == 8) {
         csId = 4;
@@ -255,7 +255,7 @@ void FlvSessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_
     }
 }
 
-void FlvSessionBase::writeRtmpHead() {
+void SessionBase::writeRtmpHead() {
     auto chunk = ObjPool::allocate<vector<unsigned char>>();
     int length = sourceSession->stream.script->size()+1;
     unsigned int num = length / chunkSize;

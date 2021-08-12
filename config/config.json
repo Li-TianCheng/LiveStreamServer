@@ -30,6 +30,10 @@
     }
   },
   "live_stream_server": {
+    "rtmp_server_port": 1935,
+    "http_flv_server_port": 8070,
+    "api_server_port": 7070,
+    "http_server_port": 8080,
     "rtmp_chunk_size": 4096,
     "flush_num": 5,
     "flush_buffer_size": 32768

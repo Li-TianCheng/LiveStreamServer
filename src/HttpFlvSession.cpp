@@ -5,7 +5,7 @@
 #include "HttpFlvSession.h"
 
 HttpFlvSession::HttpFlvSession(int bufferChunkSize) : request(nullptr), status(0), chunked(false), chunkSize(0), tmpSize(0),
-                                                      FlvSessionBase(false, bufferChunkSize), isPost(false), headSize(13) {
+                                                      SessionBase(false, bufferChunkSize), isPost(false), headSize(13) {
 
 }
 
