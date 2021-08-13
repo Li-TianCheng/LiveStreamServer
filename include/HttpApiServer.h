@@ -2,10 +2,11 @@
 // Created by ltc on 2021/7/31.
 //
 
-#ifndef LIVESTREAMSERVER_HTTPAPI_H
-#define LIVESTREAMSERVER_HTTPAPI_H
+#ifndef LIVESTREAMSERVER_HTTPAPISERVER_H
+#define LIVESTREAMSERVER_HTTPAPISERVER_H
 
 #include <jsoncpp/json/json.h>
+#include "LiveStreamServer.h"
 
 static void getStreamInfo(shared_ptr<Http> request, shared_ptr<Http> response) {
     Json::Value status;
@@ -87,12 +88,42 @@ static void getStatus(shared_ptr<Http> request, shared_ptr<Http> response) {
     response->data = data;
 }
 
+static void relay(shared_ptr<Http> request, shared_ptr<Http> response) {
+    vector<string> split = utils::split(request->line["url"], '/', 3);
+    split = utils::split(split[2], '?', 2);
+    if (split.size() == 2) {
+        if (split[0] == "relay_source") {
+            split = utils::split(split[1], '/', 5);
+            if (split.size() == 5) {
+                if (split[0] == "rtmp:") {
+                    LiveStreamServer::rtmpRelay(true, split[1], split[2], split[3], split[4]);
+                }
+                if (split[0] == "http:") {
+                    LiveStreamServer::httpFlvRelay(true, split[1], split[2], split[3], split[4]);
+                }
+            }
+        }
+        if (split[0] == "relay_sink") {
+            split = utils::split(split[1], '/', 5);
+            if (split.size() == 5) {
+                if (split[0] == "rtmp:") {
+                    LiveStreamServer::rtmpRelay(false, split[1], split[2], split[3], split[4]);
+                }
+                if (split[0] == "http:") {
+                    LiveStreamServer::httpFlvRelay(false, split[1], split[2], split[3], split[4]);
+                }
+            }
+        }
+    }
+}
+
 static void apiServerInit(HttpServer& apiServer) {
     apiServer.registerHandler("/v1/stream/status", getStreamInfo);
     apiServer.registerHandler("/v1/stream/name", getStreamName);
+    apiServer.registerRegexHandler("/v1/stream/relay_.*", relay);
     apiServer.registerHandler("/v1/server/restart", restart);
     apiServer.registerHandler("/v1/server/stop", stop);
     apiServer.registerHandler("/v1/server/status", getStatus);
 }
 
-#endif //LIVESTREAMSERVER_HTTPAPI_H
+#endif //LIVESTREAMSERVER_HTTPAPISERVER_H

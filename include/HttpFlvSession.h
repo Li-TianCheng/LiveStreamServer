@@ -14,14 +14,14 @@ class HttpFlvSession : public SessionBase {
 public:
     explicit HttpFlvSession(int bufferChunkSize);
     ~HttpFlvSession() override = default;
-private:
+protected:
     void handleReadDone(iter pos, size_t n) override;
     void parseHttpHead(const char &c);
     void writeHeader(shared_ptr<Http> response);
     void parseStreamInfo(const string& url);
     void sink();
     void source(const char& c);
-private:
+protected:
     string key;
     int status;
     int headSize;

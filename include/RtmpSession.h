@@ -21,11 +21,11 @@ class RtmpSession: public SessionBase {
 public:
     explicit RtmpSession(int bufferChunkSize);
     ~RtmpSession() override = default;
-private:
+protected:
     void handleReadDone(iter pos, size_t n) override;
-    void shakeHand(const char& c);
+    virtual void shakeHand(const char& c);
     void parseHead(const char& c);
-    void parseCmdMsg();
+    virtual void parseCmdMsg();
     void parseAMF0(vector<string>& type, vector<string>& value);
     void parseAMF3(vector<string>& type, vector<string>& value);
     void responseConnect(vector<string> &type, vector<string> &value);
@@ -35,7 +35,7 @@ private:
     void ack();
     void parseControlMsg(const char& c);
     void writeChunk(ChunkStreamHead& head, shared_ptr<vector<unsigned char>> msg);
-private:
+protected:
     int size;
     int status;
     int chunkStatus;

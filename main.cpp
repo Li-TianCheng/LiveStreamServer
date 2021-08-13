@@ -14,8 +14,7 @@ int main(int argc, char *argv[]) {
         }
     }
     modules::init(path);
-    LiveStreamServer liveStreamServer;
-    liveStreamServer.serve();
+    LiveStreamServer::serve();
     modules::close();
     return 0;
 }

@@ -3,6 +3,7 @@
 //
 
 #include "StreamCenter.h"
+#include "LiveStreamServer.h"
 
 shared_ptr<SessionBase> StreamCenter::getStream(const string& vhost, const string& app, const string& streamName) {
     getStreamCenter().rwLock.rdLock();
@@ -15,6 +16,16 @@ shared_ptr<SessionBase> StreamCenter::getStream(const string& vhost, const strin
         }
     }
     getStreamCenter().rwLock.unlock();
+    if (stream == nullptr) {
+        Json::Value relaySourceGroup = ConfigSystem::getConfig()["live_stream_server"]["relay_source"][vhost][app];
+        for (auto& g : relaySourceGroup) {
+            if (g["type"] == "http") {
+                LiveStreamServer::httpFlvRelay(true, g["host"].asString(), vhost, app, streamName);
+            } else {
+                LiveStreamServer::rtmpRelay(true, g["host"].asString(), vhost, app, streamName);
+            }
+        }
+    }
     return stream;
 }
 
@@ -23,6 +34,14 @@ void StreamCenter::addStream(const string& vhost, const string& app, const strin
     getStreamCenter().sourceNum++;
     getStreamCenter().streamCenter[vhost][app][streamName] = stream;
     getStreamCenter().rwLock.unlock();
+    Json::Value relaySinkGroup = ConfigSystem::getConfig()["live_stream_server"]["relay_sink"][vhost][app];
+    for (auto& g : relaySinkGroup) {
+        if (g["type"] == "http") {
+            LiveStreamServer::httpFlvRelay(false, g["host"].asString(), vhost, app, streamName);
+        } else {
+            LiveStreamServer::rtmpRelay(false, g["host"].asString(), vhost, app, streamName);
+        }
+    }
 }
 
 StreamCenter &StreamCenter::getStreamCenter() {

@@ -34,6 +34,9 @@
             type: 'flv',
             isLive: true,
             url: 'http://localhost:8070/com/live/test'
+        }, {
+            enableStashBuffer:false,
+            isLive:true
         });
         flvPlayer.attachMediaElement(videoElement);
         flvPlayer.load();

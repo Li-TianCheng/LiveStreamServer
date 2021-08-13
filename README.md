@@ -8,6 +8,10 @@
    >查看流状态:http://localhost:7070/v1/stream/status
    >
    >查看流名:http://localhost:7070/v1/stream/name
+   >
+   >回源:http://localhost:7070/v1/stream/relay_source?rtmp://localhost:1935/vhost/app/stream
+   > 
+   >转推:http://localhost:7070/v1/stream/relay_sink?http://localhost:8070/vhost/app/stream
    > 
    >服务重启:http://localhost:7070/v1/server/restart
    > 
@@ -17,8 +21,42 @@
 3. 支持网页播放flv
    >http://localhost:8080 进入引导页
 4. 支持vhost app stream 三级配置
+5. 支持配置转推回源
+   >转推配置:在live_stream_server配置中添加如下配置
+   ```json
+   "relay_source": {
+      "vhost1": {
+        "app1": [
+          {
+            "type": "http",
+            "host": "localhost:8070"
+          },
+          {
+            "type": "rtmp",
+            "host": "localhost:1835"
+          }
+        ]
+      }
+    }
+   ```
+   >回源配置:在live_stream_server配置中添加如下配置
+   ```json
+   "relay_sink": {
+      "vhost1": {
+        "app1": [
+          {
+            "type": "http",
+            "host": "localhost:8070"
+          },
+          {
+            "type": "rtmp",
+            "host": "localhost:1835"
+          }
+        ]
+      }
+    }
+   ```
 ## TODO
-1. 支持配置转推回源
-2. 支持api转推回源
-3. 支持平滑升级
-4. 性能优化
+1. 支持平滑升级
+2. 性能对比 
+3. 性能优化

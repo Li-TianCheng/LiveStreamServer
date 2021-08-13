@@ -167,7 +167,6 @@ void RtmpSession::parseHead(const char &c) {
                     size = 0;
                     chunkStatus = 3;
                 } else {
-
                     size = 0;
                     chunkStatus = 4;
                 }
@@ -305,11 +304,10 @@ void RtmpSession::ack() {
         ChunkStreamHead head;
         head.csId = 2;
         head.typeId = 3;
-        head.length = 4;
         auto msg = ObjPool::allocate<vector<unsigned char>>();
-        msg->push_back(chunkSize >> 24);
-        msg->push_back((chunkSize & 0x00ffffff) >> 16);
-        msg->push_back((chunkSize & 0x0000ffff) >> 8);
+        msg->push_back((chunkSize >> 24) & 0x000000ff);
+        msg->push_back((chunkSize >> 16) & 0x000000ff);
+        msg->push_back((chunkSize >> 8) & 0x000000ff);
         msg->push_back(chunkSize & 0x000000ff);
         writeChunk(head, msg);
         ackReceived = 0;
@@ -426,7 +424,7 @@ void RtmpSession::writeChunk(ChunkStreamHead &head, shared_ptr<vector<unsigned c
             chunk->push_back(head.csId | 0xc0);
         }
         write(chunk);
-        chunk->clear();
+        chunk = ObjPool::allocate<vector<unsigned char>>();
         int inc = chunkSize;
         if (head.length - i*chunkSize <= inc) {
             inc = head.length - i*chunkSize;
