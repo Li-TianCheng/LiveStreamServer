@@ -198,23 +198,7 @@ void RtmpSession::parseHead(const char &c) {
                 parseControlMsg(c);
             } else if (head->typeId == 17 || head->typeId == 20) {
                 cmd.push_back(c);
-            } else if (head->typeId == 18) {
-                if (head->idx == 16) {
-                    parseFlv(18);
-                    parseFlv(((head->length-16) >> 16) & 0x0000ff);
-                    parseFlv(((head->length-16) >> 8) & 0x0000ff);
-                    parseFlv((head->length-16) & 0x0000ff);
-                    parseFlv((head->time >> 16) & 0x000000ff);
-                    parseFlv((head->time >> 8) & 0x000000ff);
-                    parseFlv(head->time & 0x000000ff);
-                    parseFlv((head->time >> 24) & 0x000000ff);
-                    parseFlv(0);
-                    parseFlv(0);
-                    parseFlv(0);
-                } else if (size > 16) {
-                    parseFlv(c);
-                }
-            } else if (head->typeId == 8 || head->typeId == 9) {
+            } else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
                 if (head->idx == 1) {
                     parseFlv(head->typeId);
                     parseFlv((head->length >> 16) & 0x0000ff);
@@ -235,12 +219,7 @@ void RtmpSession::parseHead(const char &c) {
                 if (head->typeId == 17 || head->typeId == 20) {
                     parseCmdMsg();
                     cmd.clear();
-                } else if (head->typeId == 18) {
-                    parseFlv(((head->length-5) >> 24) & 0x000000ff);
-                    parseFlv(((head->length-5) >> 16) & 0x000000ff);
-                    parseFlv(((head->length-5) >> 8) & 0x000000ff);
-                    parseFlv((head->length-5) & 0x000000ff);
-                } else if (head->typeId == 8 || head->typeId == 9) {
+                } else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
                     parseFlv(((head->length+11)  >> 24) & 0x000000ff);
                     parseFlv(((head->length+11)  >> 16) & 0x000000ff);
                     parseFlv(((head->length+11)  >> 8) & 0x000000ff);
@@ -472,87 +451,29 @@ void RtmpSession::responseConnect(vector<string> &type, vector<string> &value) {
     resp.streamId = head->streamId;
     resp.typeId = 20;
     shared_ptr<vector<unsigned char>> respMsg = ObjPool::allocate<vector<unsigned char>>();
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(7);
-    string tmp = "_result";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
+    writeAMF0String(respMsg, "_result");
 
     respMsg->push_back(0);
     respMsg->insert(respMsg->end(), value[1].begin(), value[1].end());
 
     respMsg->push_back(3);
-    respMsg->push_back(0);
-    respMsg->push_back(6);
-    tmp = "fmsVer";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(13);
-    tmp = "FMS/3,0,1,123";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(0);
-    respMsg->push_back(12);
-    tmp = "capabilities";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(0);
-    double c = 31;
-    unsigned long l = *(unsigned long*)&(c);
-    respMsg->push_back((l >> 56) & 0x00000000000000ff);
-    respMsg->push_back((l >> 48) & 0x00000000000000ff);
-    respMsg->push_back((l >> 40) & 0x00000000000000ff);
-    respMsg->push_back((l >> 32) & 0x00000000000000ff);
-    respMsg->push_back((l >> 24) & 0x00000000000000ff);
-    respMsg->push_back((l >> 16) & 0x00000000000000ff);
-    respMsg->push_back((l >> 8) & 0x00000000000000ff);
-    respMsg->push_back(l & 0x00000000000000ff);
+    writeAMF0Key(respMsg, "fmsVer");
+    writeAMF0String(respMsg, "FMS/3,0,1,123");
+    writeAMF0Key(respMsg, "capabilities");
+    writeAMF0Num(respMsg, 31);
     respMsg->push_back(0);
     respMsg->push_back(0);
     respMsg->push_back(9);
+
     respMsg->push_back(3);
-    respMsg->push_back(0);
-    respMsg->push_back(5);
-    tmp = "level";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(6);
-    tmp = "status";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(4);
-    tmp = "code";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(29);
-    tmp = "NetConnection.Connect.Success";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(11);
-    tmp = "description";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(21);
-    tmp = "Connection succeeded.";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(14);
-    tmp = "objectEncoding";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
+    writeAMF0Key(respMsg, "level");
+    writeAMF0String(respMsg, "status");
+    writeAMF0Key(respMsg, "code");
+    writeAMF0String(respMsg, "NetConnection.Connect.Success");
+    writeAMF0Key(respMsg, "description");
+    writeAMF0String(respMsg, "Connection succeeded.");
+    writeAMF0Key(respMsg, "objectEncoding");
+    writeAMF0Num(respMsg, 0);
     respMsg->push_back(0);
     respMsg->push_back(0);
     respMsg->push_back(9);
@@ -565,25 +486,13 @@ void RtmpSession::responseCreateStream(vector<string> &type, vector<string> &val
     resp.streamId = head->streamId;
     resp.typeId = 20;
     shared_ptr<vector<unsigned char>> respMsg = ObjPool::allocate<vector<unsigned char>>();
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(7);
-    string tmp = "_result";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
+    writeAMF0String(respMsg, "_result");
+
     respMsg->push_back(0);
     respMsg->insert(respMsg->end(), value[1].begin(), value[1].end());
     respMsg->push_back(5);
-    respMsg->push_back(0);
-    double c = 1;
-    unsigned long l = *(unsigned long*)&(c);
-    respMsg->push_back((l >> 56) & 0x00000000000000ff);
-    respMsg->push_back((l >> 48) & 0x00000000000000ff);
-    respMsg->push_back((l >> 40) & 0x00000000000000ff);
-    respMsg->push_back((l >> 32) & 0x00000000000000ff);
-    respMsg->push_back((l >> 24) & 0x00000000000000ff);
-    respMsg->push_back((l >> 16) & 0x00000000000000ff);
-    respMsg->push_back((l >> 8) & 0x00000000000000ff);
-    respMsg->push_back(l & 0x00000000000000ff);
+
+    writeAMF0Num(respMsg, 1);
     writeChunk(resp, respMsg);
 }
 
@@ -593,54 +502,18 @@ void RtmpSession::responsePublish(vector<string> &type, vector<string> &value) {
     resp.streamId = head->streamId;
     resp.typeId = 20;
     shared_ptr<vector<unsigned char>> respMsg = ObjPool::allocate<vector<unsigned char>>();
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(8);
-    string tmp = "onStatus";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
+    writeAMF0String(respMsg, "onStatus");
+    writeAMF0Num(respMsg, 0);
 
     respMsg->push_back(5);
 
     respMsg->push_back(3);
-    respMsg->push_back(0);
-    respMsg->push_back(5);
-    tmp = "level";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(6);
-    tmp = "status";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(4);
-    tmp = "code";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(23);
-    tmp = "NetStream.Publish.Start";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(11);
-    tmp = "description";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(17);
-    tmp = "Start publishing.";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
+    writeAMF0Key(respMsg, "level");
+    writeAMF0String(respMsg, "status");
+    writeAMF0Key(respMsg, "code");
+    writeAMF0String(respMsg, "NetStream.Publish.Start");
+    writeAMF0Key(respMsg, "description");
+    writeAMF0String(respMsg, "Start publishing.");
     respMsg->push_back(0);
     respMsg->push_back(0);
     respMsg->push_back(9);
@@ -653,218 +526,100 @@ void RtmpSession::responsePlay(vector<string> &type, vector<string> &value) {
     resp.streamId = head->streamId;
     resp.typeId = 20;
     shared_ptr<vector<unsigned char>> respMsg = ObjPool::allocate<vector<unsigned char>>();
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(8);
-    string tmp = "onStatus";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
+    writeAMF0String(respMsg, "onStatus");
+    writeAMF0Num(respMsg, 0);
 
     respMsg->push_back(5);
 
     respMsg->push_back(3);
-    respMsg->push_back(0);
-    respMsg->push_back(5);
-    tmp = "level";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(6);
-    tmp = "status";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(4);
-    tmp = "code";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(20);
-    tmp = "NetStream.Play.Reset";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(11);
-    tmp = "description";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(29);
-    tmp = "Playing and resetting stream.";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
+    writeAMF0Key(respMsg, "level");
+    writeAMF0String(respMsg, "status");
+    writeAMF0Key(respMsg, "code");
+    writeAMF0String(respMsg, "NetStream.Play.Reset");
+    writeAMF0Key(respMsg, "description");
+    writeAMF0String(respMsg, "Playing and resetting stream.");
     respMsg->push_back(0);
     respMsg->push_back(0);
     respMsg->push_back(9);
     writeChunk(resp, respMsg);
 
     respMsg = ObjPool::allocate<vector<unsigned char>>();
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(8);
-    tmp = "onStatus";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
+    writeAMF0String(respMsg, "onStatus");
+    writeAMF0Num(respMsg, 0);
 
     respMsg->push_back(5);
 
     respMsg->push_back(3);
-    respMsg->push_back(0);
-    respMsg->push_back(5);
-    tmp = "level";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(6);
-    tmp = "status";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(4);
-    tmp = "code";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(20);
-    tmp = "NetStream.Play.Start";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(11);
-    tmp = "description";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(23);
-    tmp = "Started playing stream.";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
+    writeAMF0Key(respMsg, "level");
+    writeAMF0String(respMsg, "status");
+    writeAMF0Key(respMsg, "code");
+    writeAMF0String(respMsg, "NetStream.Play.Start");
+    writeAMF0Key(respMsg, "description");
+    writeAMF0String(respMsg, "Started playing stream.");
     respMsg->push_back(0);
     respMsg->push_back(0);
     respMsg->push_back(9);
     writeChunk(resp, respMsg);
 
     respMsg = ObjPool::allocate<vector<unsigned char>>();
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(8);
-    tmp = "onStatus";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
+    writeAMF0String(respMsg, "onStatus");
+    writeAMF0Num(respMsg, 0);
 
     respMsg->push_back(5);
 
     respMsg->push_back(3);
-    respMsg->push_back(0);
-    respMsg->push_back(5);
-    tmp = "level";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(6);
-    tmp = "status";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(4);
-    tmp = "code";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(20);
-    tmp = "NetStream.Data.Start";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(11);
-    tmp = "description";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(23);
-    tmp = "Started playing stream.";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
+    writeAMF0Key(respMsg, "level");
+    writeAMF0String(respMsg, "status");
+    writeAMF0Key(respMsg, "code");
+    writeAMF0String(respMsg, "NetStream.Data.Start");
+    writeAMF0Key(respMsg, "description");
+    writeAMF0String(respMsg, "Started playing stream.");
     respMsg->push_back(0);
     respMsg->push_back(0);
     respMsg->push_back(9);
     writeChunk(resp, respMsg);
 
     respMsg = ObjPool::allocate<vector<unsigned char>>();
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(8);
-    tmp = "onStatus";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
+    writeAMF0String(respMsg, "onStatus");
+    writeAMF0Num(respMsg, 0);
 
     respMsg->push_back(5);
 
     respMsg->push_back(3);
-    respMsg->push_back(0);
-    respMsg->push_back(5);
-    tmp = "level";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(6);
-    tmp = "status";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(4);
-    tmp = "code";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(28);
-    tmp = "NetStream.Play.PublishNotify";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-
-    respMsg->push_back(0);
-    respMsg->push_back(11);
-    tmp = "description";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
-    respMsg->push_back(2);
-    respMsg->push_back(0);
-    respMsg->push_back(23);
-    tmp = "Started playing notify.";
-    respMsg->insert(respMsg->end(), tmp.begin(), tmp.end());
+    writeAMF0Key(respMsg, "level");
+    writeAMF0String(respMsg, "status");
+    writeAMF0Key(respMsg, "code");
+    writeAMF0String(respMsg, "NetStream.Play.PublishNotify");
+    writeAMF0Key(respMsg, "description");
+    writeAMF0String(respMsg, "Started playing notify.");
     respMsg->push_back(0);
     respMsg->push_back(0);
     respMsg->push_back(9);
     writeChunk(resp, respMsg);
+}
+
+void RtmpSession::writeAMF0Num(shared_ptr<vector<unsigned char>> chunk, double num) {
+    chunk->push_back(0);
+    unsigned long l = *(unsigned long*)&(num);
+    chunk->push_back((l >> 56) & 0x00000000000000ff);
+    chunk->push_back((l >> 48) & 0x00000000000000ff);
+    chunk->push_back((l >> 40) & 0x00000000000000ff);
+    chunk->push_back((l >> 32) & 0x00000000000000ff);
+    chunk->push_back((l >> 24) & 0x00000000000000ff);
+    chunk->push_back((l >> 16) & 0x00000000000000ff);
+    chunk->push_back((l >> 8) & 0x00000000000000ff);
+    chunk->push_back(l & 0x00000000000000ff);
+}
+
+void RtmpSession::writeAMF0String(shared_ptr<vector<unsigned char>> chunk, const string& str) {
+    chunk->push_back(2);
+    chunk->push_back((str.size() >> 8) & 0x00ff);
+    chunk->push_back(str.size() & 0x00ff);
+    chunk->insert(chunk->end(), str.begin(), str.end());
+}
+
+void RtmpSession::writeAMF0Key(shared_ptr<vector<unsigned char>> chunk, const string &str) {
+    chunk->push_back((str.size() >> 8) & 0x00ff);
+    chunk->push_back(str.size() & 0x00ff);
+    chunk->insert(chunk->end(), str.begin(), str.end());
 }

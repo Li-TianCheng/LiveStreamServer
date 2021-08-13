@@ -45,3 +45,20 @@ void LiveStreamServer::rtmpRelay(bool isRelaySource, const string &address, cons
     auto session = ObjPool::allocate<RtmpRelaySession>(isRelaySource, address, vhost, app, streamName, getServer().chunkSize);
     getServer().addNewSession(address, session);
 }
+
+void LiveStreamServer::close() {
+    getServer().httpFlvServer->close();
+    getServer().rtmpServer->close();
+    getServer().apiServer.close();
+    getServer().httpServer.close();
+}
+
+void LiveStreamServer::addListener(int port, shared_ptr<TcpServerBase> server) {
+    auto arg = ObjPool::allocate<addListenerArg>();
+    arg->listener = getServer().listener;
+    arg->port = port;
+    arg->addressType = IPV4;
+    arg->server = server;
+    auto e = ObjPool::allocate<Event>(EventAddListener, arg);
+    getServer().listener->receiveEvent(e);
+}

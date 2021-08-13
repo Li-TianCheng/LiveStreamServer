@@ -16,6 +16,8 @@ public:
     static void serve();
     static void httpFlvRelay(bool isRelaySource, const string& address, const string& vhost, const string& app, const string& streamName);
     static void rtmpRelay(bool isRelaySource, const string& address, const string& vhost, const string& app, const string& streamName);
+    static void close();
+    static void addListener(int port, shared_ptr<TcpServerBase> server);
 private:
     static LiveStreamServer& getServer();
     void addNewSession(const string& address, shared_ptr<SessionBase> session);

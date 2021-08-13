@@ -27,6 +27,9 @@ protected:
     void parseHead(const char& c);
     virtual void parseCmdMsg();
     void parseAMF0(vector<string>& type, vector<string>& value);
+    void writeAMF0Num(shared_ptr<vector<unsigned char>> chunk, double num);
+    void writeAMF0String(shared_ptr<vector<unsigned char>> chunk, const string& str);
+    void writeAMF0Key(shared_ptr<vector<unsigned char>> chunk, const string& str);
     void parseAMF3(vector<string>& type, vector<string>& value);
     void responseConnect(vector<string> &type, vector<string> &value);
     void responseCreateStream(vector<string> &type, vector<string> &value);
