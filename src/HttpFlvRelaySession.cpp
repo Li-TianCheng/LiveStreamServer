@@ -25,17 +25,23 @@ void HttpFlvRelaySession::sessionInit() {
 }
 
 void HttpFlvRelaySession::handleReadDone(iter pos, size_t n) {
-    for (size_t i = 0; i < n; i++) {
+    SessionBase::handleReadDone(pos, n);
+    idx = 0;
+    msgLength = n;
+    while (idx < n) {
         if (status != 8) {
-            parseHttpHead(*(pos++));
+            parseHttpHead(pos);
+            idx++;
         } else {
             if (request->line["url"] == "200") {
                 if (isRelaySource) {
-                    source(*(pos++));
+                    source(pos);
                 } else {
                     sourceSession = StreamCenter::getStream(vhost, app, streamName);
                     addSink();
                 }
+            } else {
+                return;
             }
         }
     }

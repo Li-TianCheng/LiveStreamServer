@@ -12,7 +12,7 @@ public:
     RtmpRelaySession(bool isRelaySource, const string& address, const string& vhost, const string& app, const string& streamName, int bufferChunkSize);
     void sessionInit() override;
 private:
-    void shakeHand(const char& c) override;
+    void shakeHand(iter& pos) override;
     void connect();
     void createStream(double num);
     void setChunkSize();

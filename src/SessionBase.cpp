@@ -4,60 +4,17 @@
 
 #include "SessionBase.h"
 
-SessionBase::SessionBase(bool isRtmp, int bufferChunkSize): isRtmp(isRtmp), sourceSession(nullptr), currNum(0), frameNum(0), flvStatus(0), flvSize(0), chunkSize(ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt()),
+SessionBase::SessionBase(bool isRtmp, int bufferChunkSize): isRtmp(isRtmp), sourceSession(nullptr), currNum(0), frameNum(0), chunkSize(ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt()),
                                   count(0), lastCount(0), isAVC(false), isSource(false), isAAC(false), flushNum(ConfigSystem::getConfig()["live_stream_server"]["flush_num"].asInt()),
                                   flushBufferSize(ConfigSystem::getConfig()["live_stream_server"]["flush_buffer_size"].asInt()), TcpSession(bufferChunkSize) {
     flvTemTag = ObjPool::allocate<vector<unsigned char>>();
     rtmpTemTag = ObjPool::allocate<vector<unsigned char>>();
 }
 
-void SessionBase::parseFlv(const char &c) {
-    if (!waitPlay.empty()) {
-        mutex.lock();
-        for (auto& session : waitPlay) {
-            if (session->isRtmp) {
-                session->writeRtmpHead();
-            } else {
-                session->writeFlvHead();
-            }
-            std::ostringstream log;
-            log << "vhost:" << vhost << " app:" << app << " streamName:" << streamName << " sink[" << session << "] play";
-            LOG(Access, log.str());
-            rwLock.wrLock();
-            sinkManager.insert(session);
-            rwLock.unlock();
-        }
-        waitPlay.clear();
-        mutex.unlock();
-    }
-    switch(flvStatus) {
-        case 0: {
-            stream.currTag->push_back(c);
-            flvTemTag->push_back(c);
-            if (stream.currTag->size() == 11) {
-                flvStatus = 1;
-                flvSize = (unsigned int)(*stream.currTag)[1] << 16 | (unsigned int)(*stream.currTag)[2] << 8 | (unsigned int)(*stream.currTag)[3];
-                flvSize += 4;
-            }
-            break;
-        }
-        case 1: {
-            stream.currTag->push_back(c);
-            flvTemTag->push_back(c);
-            flvSize--;
-            if (flvSize == 0) {
-                parseTag();
-                flvStatus = 0;
-            }
-            break;
-        }
-        default: break;
-    }
-}
-
 void SessionBase::parseTag() {
     count++;
     currNum++;
+    flvTemTag->insert(flvTemTag->end(), stream.currTag->begin(), stream.currTag->end());
     flvToRtmp(rtmpTemTag, stream.currTag);
     if (currNum == flushNum || ((*stream.currTag)[0] == 9 && (*stream.currTag)[11] >> 4 == 1)) {
         rwLock.rdLock();
@@ -220,7 +177,7 @@ void SessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr
     int csId;
     if ((*tag)[0] == 8) {
         csId = 4;
-    } else if ((*tag)[0] == 9) {
+    } else if ((*tag)[0] == 9 || (*tag)[0] == 18) {
         csId = 6;
     }
     int length = tag->size()-15;
@@ -257,53 +214,7 @@ void SessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr
 
 void SessionBase::writeRtmpHead() {
     auto chunk = ObjPool::allocate<vector<unsigned char>>();
-    int length = sourceSession->stream.script->size()+1;
-    unsigned int num = length / chunkSize;
-    int total = 0;
-    for (int i = 0; i <= num; i++) {
-        if (total == length) {
-            break;
-        }
-        if (i == 0) {
-            chunk->push_back(6);
-            chunk->push_back(0);
-            chunk->push_back(0);
-            chunk->push_back(0);
-            chunk->push_back((length >> 16) & 0x0000ff);
-            chunk->push_back((length >> 8) & 0x0000ff);
-            chunk->push_back(length & 0x0000ff);
-            chunk->push_back(18);
-            chunk->push_back(1);
-            chunk->push_back(0);
-            chunk->push_back(0);
-            chunk->push_back(0);
-            chunk->push_back(2);
-            chunk->push_back(0);
-            chunk->push_back(13);
-            chunk->push_back('@');
-            chunk->push_back('s');
-            chunk->push_back('e');
-            chunk->push_back('t');
-            chunk->push_back('D');
-            chunk->push_back('a');
-            chunk->push_back('t');
-            chunk->push_back('a');
-            chunk->push_back('F');
-            chunk->push_back('r');
-            chunk->push_back('a');
-            chunk->push_back('m');
-            chunk->push_back('e');
-            total += 16;
-        } else {
-            chunk->push_back(6 | 0xc0);
-        }
-        int inc = chunkSize;
-        if (length-16-i*chunkSize <= inc) {
-            inc = length-16- i*chunkSize;
-        }
-        total += inc;
-        chunk->insert(chunk->end(), sourceSession->stream.script->begin()+i*chunkSize+11, sourceSession->stream.script->begin()+i*chunkSize+inc+11);
-    }
+    flvToRtmp(chunk, sourceSession->stream.script);
     if (sourceSession->isAAC) {
         flvToRtmp(chunk, sourceSession->stream.aacTag);
     }
@@ -314,4 +225,25 @@ void SessionBase::writeRtmpHead() {
         flvToRtmp(chunk, sourceSession->stream.gop[i]);
     }
     write(chunk);
+}
+
+void SessionBase::handleReadDone(iter pos, size_t n) {
+    if (!waitPlay.empty()) {
+        mutex.lock();
+        for (auto& session : waitPlay) {
+            if (session->isRtmp) {
+                session->writeRtmpHead();
+            } else {
+                session->writeFlvHead();
+            }
+            std::ostringstream log;
+            log << "vhost:" << vhost << " app:" << app << " streamName:" << streamName << " sink[" << session << "] play";
+            LOG(Access, log.str());
+            rwLock.wrLock();
+            sinkManager.insert(session);
+            rwLock.unlock();
+        }
+        waitPlay.clear();
+        mutex.unlock();
+    }
 }

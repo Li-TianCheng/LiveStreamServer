@@ -18,12 +18,12 @@ public:
     void writeFlvHead();
     void writeRtmpHead();
     void addSink();
+    void handleReadDone(iter pos, size_t n) override;
     void sessionInit() override;
     void sessionClear() override;
     void handleTickerTimeOut(const string &uuid) override;
     ~SessionBase() override = default;
 protected:
-    void parseFlv(const char& c);
     void parseTag();
     void flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr<vector<unsigned char>> tag);
 protected:
@@ -37,8 +37,6 @@ protected:
     int frameNum;
     int flushNum;
     int flushBufferSize;
-    int flvStatus;
-    unsigned int flvSize;
     unsigned int chunkSize;
     string streamName;
     string app;

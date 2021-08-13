@@ -16,19 +16,26 @@ public:
     ~HttpFlvSession() override = default;
 protected:
     void handleReadDone(iter pos, size_t n) override;
-    void parseHttpHead(const char &c);
+    void parseHttpHead(iter& pos);
     void writeHeader(shared_ptr<Http> response);
     void parseStreamInfo(const string& url);
     void sink();
-    void source(const char& c);
+    void source(iter& pos);
+    void parseFlv(iter& pos);
 protected:
     string key;
     int status;
     int headSize;
     bool chunked;
     bool isPost;
-    size_t tmpSize;
+    int flvStatus;
+    unsigned int typeId;
+    unsigned int flvSize;
+    size_t size;
     size_t chunkSize;
+    size_t tmpSize;
+    size_t msgLength;
+    size_t idx;
     shared_ptr<Http> request;
 };
 

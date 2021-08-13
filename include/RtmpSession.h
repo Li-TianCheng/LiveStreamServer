@@ -23,8 +23,8 @@ public:
     ~RtmpSession() override = default;
 protected:
     void handleReadDone(iter pos, size_t n) override;
-    virtual void shakeHand(const char& c);
-    void parseHead(const char& c);
+    virtual void shakeHand(iter& pos);
+    void parseHead(iter& pos);
     virtual void parseCmdMsg();
     void parseAMF0(vector<string>& type, vector<string>& value);
     void writeAMF0Num(shared_ptr<vector<unsigned char>> chunk, double num);
@@ -36,12 +36,14 @@ protected:
     void responsePublish(vector<string> &type, vector<string> &value);
     void responsePlay(vector<string> &type, vector<string> &value);
     void ack();
-    void parseControlMsg(const char& c);
+    void parseControlMsg();
     void writeChunk(ChunkStreamHead& head, shared_ptr<vector<unsigned char>> msg);
 protected:
     int size;
     int status;
     int chunkStatus;
+    size_t idx;
+    size_t msgLength;
     unsigned int chunkSize;
     unsigned int remoteChunkSize;
     unsigned int windowAckSize;

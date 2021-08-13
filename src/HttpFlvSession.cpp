@@ -4,22 +4,26 @@
 
 #include "HttpFlvSession.h"
 
-HttpFlvSession::HttpFlvSession(int bufferChunkSize) : request(nullptr), status(0), chunked(false), chunkSize(0), tmpSize(0),
+HttpFlvSession::HttpFlvSession(int bufferChunkSize) : request(nullptr), status(0), chunked(false), chunkSize(0), flvStatus(0), flvSize(0),tmpSize(0),
                                                       SessionBase(false, bufferChunkSize), isPost(false), headSize(13) {
 
 }
 
 void HttpFlvSession::handleReadDone(iter pos, size_t n) {
-    for (size_t i = 0; i < n; i++) {
+    SessionBase::handleReadDone(pos, n);
+    idx = 0;
+    msgLength = n;
+    while (idx < n) {
         if (status != 8) {
-            parseHttpHead(*(pos++));
+            parseHttpHead(pos);
+            idx++;
         } else {
             if (streamName.empty()) {
                 sink();
                 return;
             }
             if (isPost) {
-                source(*(pos++));
+                source(pos);
             }
         }
     }
@@ -29,7 +33,8 @@ void HttpFlvSession::handleReadDone(iter pos, size_t n) {
     readDone(n);
 }
 
-void HttpFlvSession::parseHttpHead(const char &c) {
+void HttpFlvSession::parseHttpHead(iter& pos) {
+    char c = *(pos+idx);
     switch(status) {
         case 0:{
             request = ObjPool::allocate<Http>();
@@ -135,22 +140,20 @@ void HttpFlvSession::sink() {
     addSink();
 }
 
-void HttpFlvSession::source(const char &c) {
+void HttpFlvSession::source(iter& pos) {
     if (chunked) {
         if (chunkSize != 0) {
-            chunkSize--;
-            if (headSize != 0) {
-                headSize--;
-            } else {
-                parseFlv(c);
-            }
+            parseFlv(pos);
         } else {
+            char c = *(pos+idx);
             if (c == '\r') {
+                idx++;
                 return;
             }
             if (c == '\n') {
                 chunkSize = tmpSize;
                 tmpSize = 0;
+                idx++;
                 return;
             }
             if (c >= '0' && c <= '9') {
@@ -160,13 +163,10 @@ void HttpFlvSession::source(const char &c) {
             } else {
                 tmpSize = tmpSize*16 + c - 'a' + 10;
             }
+            idx++;
         }
     } else {
-        if (headSize != 0) {
-            headSize--;
-        } else {
-            parseFlv(c);
-        }
+        parseFlv(pos);
     }
 }
 
@@ -191,4 +191,72 @@ void HttpFlvSession::writeHeader(shared_ptr<Http> response) {
     msg += "\r\n";
     auto m = ObjPool::allocate<string>(std::move(msg));
     write(m);
+}
+
+void HttpFlvSession::parseFlv(iter &pos) {
+    if (headSize != 0) {
+        size_t remain = msgLength-idx;
+        if (chunked) {
+            remain = chunkSize < msgLength-idx ? chunkSize : msgLength-idx;
+        }
+        size_t inc = remain < headSize ? remain : headSize;
+        headSize -= inc;
+        idx += inc;
+        if (chunked) {
+            chunkSize -= inc;
+        }
+    } else {
+        switch(flvStatus) {
+            case 0: {
+                typeId = *(pos+idx);
+                idx++;
+                if (chunked) {
+                    chunkSize--;
+                }
+                flvStatus = 1;
+                size = 0;
+                break;
+            }
+            case 1: {
+                unsigned char c = *(pos+idx);
+                flvSize = (flvSize << 8) | c;
+                idx++;
+                size++;
+                if (chunked) {
+                    chunkSize--;
+                }
+                if (size == 3) {
+                    size = 0;
+                    flvStatus = 2;
+                }
+                break;
+            }
+            case 2: {
+                if (size == 0) {
+                    stream.currTag->push_back(typeId);
+                    stream.currTag->push_back((flvSize>>16) & 0x0000ff);
+                    stream.currTag->push_back((flvSize>>8) & 0x0000ff);
+                    stream.currTag->push_back(flvSize & 0x0000ff);
+                }
+                size_t remain = msgLength-idx;
+                if (chunked) {
+                    remain = chunkSize < msgLength-idx ? chunkSize : msgLength-idx;
+                }
+                size_t inc = remain < flvSize-size+11 ? remain : flvSize-size+11;
+                copy(pos+idx, inc, *stream.currTag);
+                idx += inc;
+                size += inc;
+                if (chunked) {
+                    chunkSize -= inc;
+                }
+                if (size == flvSize+11) {
+                    size = 0;
+                    flvSize = 0;
+                    flvStatus = 0;
+                    parseTag();
+                }
+                break;
+            }
+        }
+    }
 }

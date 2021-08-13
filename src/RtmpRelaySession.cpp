@@ -19,15 +19,18 @@ void RtmpRelaySession::sessionInit() {
     write(c0c1);
 }
 
-void RtmpRelaySession::shakeHand(const char &c) {
+void RtmpRelaySession::shakeHand(iter& pos) {
     switch (status) {
         case 0:{
             status = 1;
+            idx++;
             break;
         }
         case 1:{
-            c1->push_back(c);
-            size--;
+            size_t inc = size < msgLength-idx ? size : msgLength-idx;
+            copy(pos+idx, inc, *c1);
+            size -= inc;
+            idx += inc;
             if (size == 0) {
                 write(c1);
                 status = 2;
@@ -41,6 +44,7 @@ void RtmpRelaySession::shakeHand(const char &c) {
                 status = 3;
                 connect();
             }
+            idx++;
             break;
         }
         default: break;

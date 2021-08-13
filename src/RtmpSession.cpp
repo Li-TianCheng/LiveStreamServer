@@ -11,28 +11,34 @@ RtmpSession::RtmpSession(int bufferChunkSize): status(0), size(1536), chunkStatu
 }
 
 void RtmpSession::handleReadDone(iter pos, size_t n) {
-    for (size_t i = 0; i < n; i++){
+    SessionBase::handleReadDone(pos, n);
+    idx = 0;
+    msgLength = n;
+    while (idx < n) {
         if (status != 3) {
-            shakeHand(*(pos++));
+            shakeHand(pos);
         } else {
-            parseHead(*(pos++));
+            parseHead(pos);
         }
     }
     readDone(n);
 }
 
-void RtmpSession::shakeHand(const char &c) {
+void RtmpSession::shakeHand(iter& pos) {
     switch (status) {
         case 0:{
             auto s0s1 = ObjPool::allocate<vector<char>>(1536+1, 0);
             (*s0s1)[0] = 3;
             write(s0s1);
             status = 1;
+            idx++;
             break;
         }
         case 1:{
-            c1->push_back(c);
-            size--;
+            size_t inc = size < msgLength-idx ? size : msgLength-idx;
+            copy(pos+idx, inc, *c1);
+            size -= inc;
+            idx += inc;
             if (size == 0) {
                 write(c1);
                 status = 2;
@@ -45,17 +51,19 @@ void RtmpSession::shakeHand(const char &c) {
             if (size == 0) {
                 status = 3;
             }
+            idx++;
             break;
         }
         default: break;
     }
 }
 
-void RtmpSession::parseHead(const char &c) {
+void RtmpSession::parseHead(iter& pos) {
     switch (chunkStatus) {
         case 0: {
-            fmt = (unsigned char)c >> 6;
-            csId = (unsigned char)c & 0x3f;
+            unsigned char c = *(pos+idx);
+            fmt = c >> 6;
+            csId = c & 0x3f;
             if (fmt == 0) {
                 msgHeaderSize = 11;
             } else if (fmt == 1) {
@@ -98,9 +106,11 @@ void RtmpSession::parseHead(const char &c) {
                     chunkStatus = 1;
                 }
             }
+            idx++;
             break;
         }
         case 1: {
+            unsigned char c = *(pos+idx);
             size++;
             csId = (csId << 8) | ((unsigned char)c);
             if (size == basicHeaderSize) {
@@ -120,9 +130,11 @@ void RtmpSession::parseHead(const char &c) {
                     chunkStatus = 2;
                 }
             }
+            idx++;
             break;
         }
         case 2: {
+            unsigned char c = *(pos+idx);
             size++;
             if (size == 1) {
                 time = 0;
@@ -171,9 +183,11 @@ void RtmpSession::parseHead(const char &c) {
                     chunkStatus = 4;
                 }
             }
+            idx++;
             break;
         }
         case 3: {
+            unsigned char c = *(pos+idx);
             size++;
             time = (time << 8) | ((unsigned char)c);
             if (size == 4) {
@@ -186,44 +200,50 @@ void RtmpSession::parseHead(const char &c) {
                 chunkStatus = 4;
                 extend = false;
             }
+            idx++;
             break;
         }
         case 4: {
-            size++;
-            head->idx++;
-            if (head->idx == 1) {
+            size_t remain = head->length-head->idx < remoteChunkSize-size ? head->length-head->idx : remoteChunkSize-size;
+            size_t inc = remain < msgLength-idx ? remain : msgLength-idx;
+            if (head->idx == 0) {
                 head->time += head->timeDelta;
             }
-            if (head->typeId == 1 || head->typeId == 5) {
-                parseControlMsg(c);
-            } else if (head->typeId == 17 || head->typeId == 20) {
-                cmd.push_back(c);
+            if (head->typeId == 1 || head->typeId == 5 || head->typeId == 17 || head->typeId == 20) {
+                copy(pos+idx, inc, cmd);
             } else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
-                if (head->idx == 1) {
-                    parseFlv(head->typeId);
-                    parseFlv((head->length >> 16) & 0x0000ff);
-                    parseFlv((head->length >> 8) & 0x0000ff);
-                    parseFlv(head->length & 0x0000ff);
-                    parseFlv((head->time >> 16) & 0x000000ff);
-                    parseFlv((head->time >> 8) & 0x000000ff);
-                    parseFlv(head->time & 0x000000ff);
-                    parseFlv((head->time >> 24) & 0x000000ff);
-                    parseFlv(0);
-                    parseFlv(0);
-                    parseFlv(0);
+                if (head->idx == 0) {
+                    stream.currTag->push_back(head->typeId);
+                    stream.currTag->push_back((head->length >> 16) & 0x0000ff);
+                    stream.currTag->push_back((head->length >> 8) & 0x0000ff);
+                    stream.currTag->push_back(head->length & 0x0000ff);
+                    stream.currTag->push_back((head->time >> 16) & 0x000000ff);
+                    stream.currTag->push_back((head->time >> 8) & 0x000000ff);
+                    stream.currTag->push_back(head->time & 0x000000ff);
+                    stream.currTag->push_back((head->time >> 24) & 0x000000ff);
+                    stream.currTag->push_back(0);
+                    stream.currTag->push_back(0);
+                    stream.currTag->push_back(0);
                 }
-                parseFlv(c);
+                copy(pos+idx, inc, *stream.currTag);
             }
+            size += inc;
+            head->idx += inc;
+            idx += inc;
             if (head->idx == head->length) {
                 ack();
-                if (head->typeId == 17 || head->typeId == 20) {
+                if (head->typeId == 1 || head->typeId == 5) {
+                    parseControlMsg();
+                    cmd.clear();
+                } else if (head->typeId == 17 || head->typeId == 20) {
                     parseCmdMsg();
                     cmd.clear();
                 } else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
-                    parseFlv(((head->length+11)  >> 24) & 0x000000ff);
-                    parseFlv(((head->length+11)  >> 16) & 0x000000ff);
-                    parseFlv(((head->length+11)  >> 8) & 0x000000ff);
-                    parseFlv((head->length+11) & 0x000000ff);
+                    stream.currTag->push_back(((head->length+11)  >> 24) & 0x000000ff);
+                    stream.currTag->push_back(((head->length+11)  >> 16) & 0x000000ff);
+                    stream.currTag->push_back(((head->length+11)  >> 8) & 0x000000ff);
+                    stream.currTag->push_back((head->length+11) & 0x000000ff);
+                    parseTag();
                 }
                 head->idx = 0;
                 size = 0;
@@ -293,17 +313,13 @@ void RtmpSession::ack() {
     }
 }
 
-void RtmpSession::parseControlMsg(const char &c) {
+void RtmpSession::parseControlMsg() {
     if (head->typeId == 1) {
-        if (size == 1) {
-            remoteChunkSize = 0;
-        }
-        remoteChunkSize = (remoteChunkSize << 8) | (unsigned char)c;
+        remoteChunkSize = 0;
+        remoteChunkSize = ((unsigned int)cmd[0] << 24) | ((unsigned int)cmd[1] << 16) | ((unsigned int)cmd[2] << 8) | (unsigned int)cmd[3];
     } else if (head->typeId == 5) {
-        if (size == 1) {
-            remoteWindowAckSize = 0;
-        }
-        remoteWindowAckSize = (remoteWindowAckSize << 8) | (unsigned char)c;
+        remoteWindowAckSize = 0;
+        remoteWindowAckSize = ((unsigned int)cmd[0] << 24) | ((unsigned int)cmd[1] << 16) | ((unsigned int)cmd[2] << 8) | (unsigned int)cmd[3];
     }
 }
 
