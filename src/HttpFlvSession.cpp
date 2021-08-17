@@ -24,6 +24,8 @@ void HttpFlvSession::handleReadDone(iter pos, size_t n) {
             }
             if (isPost) {
                 source(pos);
+            } else {
+                break;
             }
         }
     }
