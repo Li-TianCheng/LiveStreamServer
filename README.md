@@ -62,4 +62,10 @@
    ```
 
 ## 启动
-* 运行run.sh脚本，利用docker自动编译运行
+* 利用docker自动编译运行
+```
+git clone https://github.com/Li-TianCheng/LiveStreamServer.git
+git submodule update --init --recursive
+cd scripts
+./run.sh
+```
