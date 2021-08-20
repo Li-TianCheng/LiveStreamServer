@@ -65,6 +65,7 @@
 * 利用docker自动编译运行
 ```
 git clone https://github.com/Li-TianCheng/LiveStreamServer.git
+cd LiveStreamServer
 git submodule update --init --recursive
 cd scripts
 ./run.sh
