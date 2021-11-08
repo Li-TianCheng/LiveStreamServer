@@ -5,7 +5,7 @@
    > 
    >http-flv推拉流url:http://localhost:8070/vhost/app/stream
 2. 支持简易api
-   >查看流状态:http://localhost:7070/v1/stream/status
+   > 查看流状态:http://localhost:7070/v1/stream/status
    >
    >查看流名:http://localhost:7070/v1/stream/name
    >
@@ -21,7 +21,7 @@
    > 
    >服务平滑升级:http://localhost:7070/v1/server/update
    >
-   >服务资源占用:http://localhost:7070/server/status
+   >服务资源占用:http://localhost:7070/v1/server/status
 3. 支持网页播放flv
    >http://localhost:8080 进入引导页
 4. 支持vhost app stream 三级配置
