@@ -105,6 +105,14 @@ void HttpFlvSession::parseHttpHead(iter& pos) {
                 }
                 parseStreamInfo(request->line["url"]);
                 isPost = request->line["method"] == "POST";
+				if (isPost) {
+					auto response = ObjPool::allocate<Http>();
+					response->line["version"] = request->line["version"];
+					response->line["status"] = "200";
+					response->line["msg"] = "OK";
+					response->head["Access-Control-Allow-Origin"] = "*";
+					writeHeader(response);
+				}
                 status = 8;
                 break;
             } else {
