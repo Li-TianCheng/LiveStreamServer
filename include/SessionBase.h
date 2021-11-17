@@ -21,7 +21,7 @@ public:
     void handleReadDone(iter pos, size_t n) override;
     void sessionInit() override;
     void sessionClear() override;
-    void handleTickerTimeOut(const string &uuid) override;
+    void handleTickerTimeOut(shared_ptr<Time> t) override;
     ~SessionBase() override = default;
 protected:
     void parseTag();
@@ -41,8 +41,8 @@ protected:
     string streamName;
     string app;
     string vhost;
-    string uuid;
     Stream stream;
+	shared_ptr<Time> time;
     shared_ptr<SessionBase> sourceSession;
     shared_ptr<vector<unsigned char>> flvTemTag;
     shared_ptr<vector<unsigned char>> rtmpTemTag;

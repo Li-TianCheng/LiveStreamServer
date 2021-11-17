@@ -96,7 +96,7 @@ void SessionBase::addSink() {
 }
 
 void SessionBase::sessionInit() {
-    uuid = addTicker(0, 0, 1, 0);
+    time = addTicker(0, 0, 1, 0);
 }
 
 void SessionBase::sessionClear() {
@@ -135,8 +135,8 @@ void SessionBase::sessionClear() {
     sourceSession = nullptr;
 }
 
-void SessionBase::handleTickerTimeOut(const string &uuid) {
-    if (this->uuid == uuid) {
+void SessionBase::handleTickerTimeOut(shared_ptr<Time> t) {
+    if (time == t) {
         if (lastCount == count) {
             deleteSession();
         } else {
