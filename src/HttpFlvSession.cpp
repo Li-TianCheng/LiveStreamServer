@@ -135,8 +135,8 @@ void HttpFlvSession::sink() {
         writeHeader(response);
         return;
     }
-    sourceSession = StreamCenter::getStream(vhost, app, streamName);
-    if (sourceSession == nullptr) {
+    sourceSession = StreamCenter::getStream(isRelay, vhost, app, streamName);
+    if (sourceSession.lock() == nullptr) {
         response->line["status"] = "404";
         response->line["msg"] = "NOT FOUND";
         response->head["Content-Length"] = "0";

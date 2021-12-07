@@ -20,7 +20,7 @@ public:
     static void addListener(int port, shared_ptr<TcpServerBase> server);
 private:
     static LiveStreamServer& getServer();
-    void addNewSession(const string& address, shared_ptr<SessionBase> session);
+    bool addNewSession(const string& address, shared_ptr<SessionBase> session);
     LiveStreamServer();
 private:
     int chunkSize;

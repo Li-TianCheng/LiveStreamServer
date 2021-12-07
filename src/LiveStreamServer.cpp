@@ -24,26 +24,20 @@ LiveStreamServer &LiveStreamServer::getServer() {
     return server;
 }
 
-void LiveStreamServer::addNewSession(const string &address, shared_ptr<SessionBase> session) {
-    auto arg = ObjPool::allocate<addNewSessionArg>();
-    arg->listener = listener;
-    arg->session = session;
-    arg->address = address;
-    arg->addressType = IPV4;
-    auto e = ObjPool::allocate<Event>(EventAddSession, arg);
-    listener->receiveEvent(e);
+bool LiveStreamServer::addNewSession(const string &address, shared_ptr<SessionBase> session) {
+	return listener->addNewSession(session, address, IPV4);
 }
 
 void LiveStreamServer::httpFlvRelay(bool isRelaySource, const string &address, const string &vhost, const string &app,
                                     const string &streamName) {
     auto session = ObjPool::allocate<HttpFlvRelaySession>(isRelaySource, vhost, app, streamName, getServer().chunkSize);
-    getServer().addNewSession(address, session);
+	getServer().addNewSession(address, session);
 }
 
 void LiveStreamServer::rtmpRelay(bool isRelaySource, const string &address, const string &vhost, const string &app,
                                  const string &streamName) {
     auto session = ObjPool::allocate<RtmpRelaySession>(isRelaySource, address, vhost, app, streamName, getServer().chunkSize);
-    getServer().addNewSession(address, session);
+	getServer().addNewSession(address, session);
 }
 
 void LiveStreamServer::close() {

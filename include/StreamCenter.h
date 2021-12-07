@@ -20,7 +20,7 @@ class SessionBase;
 
 class StreamCenter {
 public:
-    static shared_ptr<SessionBase> getStream(const string& vhost, const string& app, const string& streamName);
+    static shared_ptr<SessionBase> getStream(bool isRelay, const string& vhost, const string& app, const string& streamName);
     static void addStream(const string& vhost, const string& app, const string& streamName, shared_ptr<SessionBase> stream);
     static void deleteStream(const string& vhost, const string& app, const string& streamName);
     static void updateSinkNum(int diff);

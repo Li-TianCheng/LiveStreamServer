@@ -12,8 +12,7 @@
       "read_buffer_chunk_size": 16384,
       "listener": {
         "max_epoll_task_num": 10,
-        "check_time": 1000,
-        "listen_num": 500,
+        "accept_num": 500,
         "epoll_session_num": 1000
       }
     },

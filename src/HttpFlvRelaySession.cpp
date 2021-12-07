@@ -9,6 +9,7 @@ HttpFlvRelaySession::HttpFlvRelaySession(bool isRelaySource, const string& vhost
     this->vhost = vhost;
     this->app = app;
     this->streamName = streamName;
+	isRelay = true;
 }
 
 void HttpFlvRelaySession::sessionInit() {
@@ -37,7 +38,7 @@ void HttpFlvRelaySession::handleReadDone(iter pos, size_t n) {
                 if (isRelaySource) {
                     source(pos);
                 } else {
-                    sourceSession = StreamCenter::getStream(vhost, app, streamName);
+                    sourceSession = StreamCenter::getStream(isRelay, vhost, app, streamName);
                     addSink();
                 }
             } else {

@@ -10,6 +10,7 @@ RtmpRelaySession::RtmpRelaySession(bool isRelaySource, const string& address, co
     this->app = app;
     this->streamName = streamName;
     c1->reserve(1536);
+	isRelay = true;
 }
 
 void RtmpRelaySession::sessionInit() {
@@ -106,7 +107,7 @@ void RtmpRelaySession::parseCmdMsg() {
             } else {
                 if (n == 4) {
                     publish();
-                    sourceSession = StreamCenter::getStream(vhost, app, streamName);
+                    sourceSession = StreamCenter::getStream(isRelay, vhost, app, streamName);
                     addSink();
                 }
             }

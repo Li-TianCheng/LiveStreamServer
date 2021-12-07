@@ -4,9 +4,9 @@
 
 #include "SessionBase.h"
 
-SessionBase::SessionBase(bool isRtmp, int bufferChunkSize): isRtmp(isRtmp), sourceSession(nullptr), currNum(0), frameNum(0), chunkSize(ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt()),
+SessionBase::SessionBase(bool isRtmp, int bufferChunkSize): isRtmp(isRtmp), currNum(0), frameNum(0), chunkSize(ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt()),
                                   count(0), lastCount(0), isAVC(false), isSource(false), isAAC(false), flushNum(ConfigSystem::getConfig()["live_stream_server"]["flush_num"].asInt()),
-                                  flushBufferSize(ConfigSystem::getConfig()["live_stream_server"]["flush_buffer_size"].asInt()), TcpSession(bufferChunkSize) {
+                                  isRelay(false), flushBufferSize(ConfigSystem::getConfig()["live_stream_server"]["flush_buffer_size"].asInt()), TcpSession(bufferChunkSize) {
     flvTemTag = ObjPool::allocate<vector<unsigned char>>();
     rtmpTemTag = ObjPool::allocate<vector<unsigned char>>();
 }
@@ -70,7 +70,7 @@ void SessionBase::parseTag() {
             auto tem = stream.currTag;
             stream.currTag = stream.script;
             stream.script = tem;
-            if (StreamCenter::getStream(vhost, app, streamName) != nullptr) {
+            if (StreamCenter::getStream(isRelay, vhost, app, streamName) != nullptr) {
                 deleteSession();
                 break;
             }
@@ -87,11 +87,12 @@ void SessionBase::parseTag() {
 }
 
 void SessionBase::addSink() {
-    if (sourceSession != nullptr) {
+	auto session = sourceSession.lock();
+    if (session != nullptr) {
         StreamCenter::updateSinkNum(1);
-        sourceSession->mutex.lock();
-        sourceSession->waitPlay.insert(static_pointer_cast<SessionBase>(shared_from_this()));
-        sourceSession->mutex.unlock();
+	    session->mutex.lock();
+	    session->waitPlay.insert(static_pointer_cast<SessionBase>(shared_from_this()));
+	    session->mutex.unlock();
     }
 }
 
@@ -102,37 +103,24 @@ void SessionBase::sessionInit() {
 void SessionBase::sessionClear() {
     if (isSource) {
         StreamCenter::deleteStream(vhost, app, streamName);
-        mutex.lock();
-        waitPlay.clear();
-        mutex.unlock();
-        rwLock.wrLock();
-        for (auto& session : sinkManager) {
-            if (session->isRtmp) {
-                session->write(rtmpTemTag);
-            } else {
-                session->write(flvTemTag);
-            }
-        }
-        sinkManager.clear();
-        rwLock.unlock();
         std::ostringstream log;
         log << "vhost:" << vhost << " app:" << app << " streamName:" << streamName << " source[" << shared_from_this() << "] end";
         LOG(Info, log.str());
     } else {
-        if (sourceSession != nullptr) {
+	    auto session = sourceSession.lock();
+        if (session != nullptr) {
             StreamCenter::updateSinkNum(-1);
-            mutex.lock();
-            sourceSession->waitPlay.erase(static_pointer_cast<SessionBase>(shared_from_this()));
-            mutex.unlock();
-            sourceSession->rwLock.wrLock();
-            sourceSession->sinkManager.erase(static_pointer_cast<SessionBase>(shared_from_this()));
-            sourceSession->rwLock.unlock();
+	        session->mutex.lock();
+	        session->waitPlay.erase(static_pointer_cast<SessionBase>(shared_from_this()));
+	        session->mutex.unlock();
+	        session->rwLock.wrLock();
+	        session->sinkManager.erase(static_pointer_cast<SessionBase>(shared_from_this()));
+	        session->rwLock.unlock();
             std::ostringstream log;
             log << "vhost:" << vhost << " app:" << app << " streamName:" << streamName << " sink[" << shared_from_this() << "] end";
             LOG(Info, log.str());
         }
     }
-    sourceSession = nullptr;
 }
 
 void SessionBase::handleTickerTimeOut(shared_ptr<Time> t) {
@@ -147,30 +135,33 @@ void SessionBase::handleTickerTimeOut(shared_ptr<Time> t) {
 
 void SessionBase::writeFlvHead() {
     auto head = ObjPool::allocate<vector<unsigned char>>();
-    head->push_back('F');
-    head->push_back('L');
-    head->push_back('V');
-    head->push_back(1);
-    head->push_back(5);
-    head->push_back(0);
-    head->push_back(0);
-    head->push_back(0);
-    head->push_back(9);
-    head->push_back(0);
-    head->push_back(0);
-    head->push_back(0);
-    head->push_back(0);
-    write(head);
-    write(sourceSession->stream.script);
-    if (sourceSession->isAAC) {
-        write(sourceSession->stream.aacTag);
-    }
-    if (sourceSession->isAVC) {
-        write(sourceSession->stream.avcTag);
-    }
-    for (int i = 0; i < (sourceSession->stream.idx-sourceSession->frameNum); i++) {
-        write(sourceSession->stream.gop[i]);
-    }
+	auto session = sourceSession.lock();
+	if (session != nullptr) {
+		head->push_back('F');
+		head->push_back('L');
+		head->push_back('V');
+		head->push_back(1);
+		head->push_back(5);
+		head->push_back(0);
+		head->push_back(0);
+		head->push_back(0);
+		head->push_back(9);
+		head->push_back(0);
+		head->push_back(0);
+		head->push_back(0);
+		head->push_back(0);
+		write(head);
+		write(session->stream.script);
+		if (session->isAAC) {
+			write(session->stream.aacTag);
+		}
+		if (session->isAVC) {
+			write(session->stream.avcTag);
+		}
+		for (int i = 0; i < (session->stream.idx-session->frameNum); i++) {
+			write(session->stream.gop[i]);
+		}
+	}
 }
 
 void SessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr<vector<unsigned char>> tag) {
@@ -214,17 +205,20 @@ void SessionBase::flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr
 
 void SessionBase::writeRtmpHead() {
     auto chunk = ObjPool::allocate<vector<unsigned char>>();
-    flvToRtmp(chunk, sourceSession->stream.script);
-    if (sourceSession->isAAC) {
-        flvToRtmp(chunk, sourceSession->stream.aacTag);
-    }
-    if (sourceSession->isAVC) {
-        flvToRtmp(chunk, sourceSession->stream.avcTag);
-    }
-    for (int i = 0; i < (sourceSession->stream.idx-sourceSession->frameNum); i++) {
-        flvToRtmp(chunk, sourceSession->stream.gop[i]);
-    }
-    write(chunk);
+	auto session = sourceSession.lock();
+	if (session != nullptr) {
+		flvToRtmp(chunk, session->stream.script);
+		if (session->isAAC) {
+			flvToRtmp(chunk, session->stream.aacTag);
+		}
+		if (session->isAVC) {
+			flvToRtmp(chunk, session->stream.avcTag);
+		}
+		for (int i = 0; i < (session->stream.idx-session->frameNum); i++) {
+			flvToRtmp(chunk, session->stream.gop[i]);
+		}
+		write(chunk);
+	}
 }
 
 void SessionBase::handleReadDone(iter pos, size_t n) {

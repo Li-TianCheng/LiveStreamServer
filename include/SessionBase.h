@@ -31,6 +31,7 @@ protected:
     bool isSource;
     bool isAVC;
     bool isAAC;
+	bool isRelay;
     int count;
     int lastCount;
     int currNum;
@@ -43,7 +44,7 @@ protected:
     string vhost;
     Stream stream;
 	shared_ptr<Time> time;
-    shared_ptr<SessionBase> sourceSession;
+    weak_ptr<SessionBase> sourceSession;
     shared_ptr<vector<unsigned char>> flvTemTag;
     shared_ptr<vector<unsigned char>> rtmpTemTag;
     unordered_set<shared_ptr<SessionBase>> waitPlay;

@@ -281,8 +281,8 @@ void RtmpSession::parseCmdMsg() {
         }
         if (value[0] == "play") {
             streamName = value[2];
-            sourceSession = StreamCenter::getStream(vhost, app, streamName);
-            if (sourceSession != nullptr) {
+            sourceSession = StreamCenter::getStream(isRelay, vhost, app, streamName);
+            if (sourceSession.lock() != nullptr) {
                 responsePlay(type, value);
                 addSink();
             }

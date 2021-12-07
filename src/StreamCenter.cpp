@@ -5,7 +5,7 @@
 #include "StreamCenter.h"
 #include "LiveStreamServer.h"
 
-shared_ptr<SessionBase> StreamCenter::getStream(const string& vhost, const string& app, const string& streamName) {
+shared_ptr<SessionBase> StreamCenter::getStream(bool isRelay, const string& vhost, const string& app, const string& streamName) {
     getStreamCenter().rwLock.rdLock();
     shared_ptr<SessionBase> stream = nullptr;
     if (getStreamCenter().streamCenter.find(vhost) != getStreamCenter().streamCenter.end()) {
@@ -16,15 +16,25 @@ shared_ptr<SessionBase> StreamCenter::getStream(const string& vhost, const strin
         }
     }
     getStreamCenter().rwLock.unlock();
-    if (stream == nullptr) {
+    if (!isRelay && stream == nullptr) {
         Json::Value relaySourceGroup = ConfigSystem::getConfig()["live_stream_server"]["relay_source"][vhost][app];
         for (auto& g : relaySourceGroup) {
             if (g["type"] == "http") {
-                LiveStreamServer::httpFlvRelay(true, g["host"].asString(), vhost, app, streamName);
-            } else {
-                LiveStreamServer::rtmpRelay(true, g["host"].asString(), vhost, app, streamName);
+	            LiveStreamServer::httpFlvRelay(true, g["host"].asString(), vhost, app, streamName);
+			} else {
+	            LiveStreamServer::rtmpRelay(true, g["host"].asString(), vhost, app, streamName);
             }
         }
+	    usleep(10*1000);
+	    getStreamCenter().rwLock.rdLock();
+	    if (getStreamCenter().streamCenter.find(vhost) != getStreamCenter().streamCenter.end()) {
+		    if (getStreamCenter().streamCenter[vhost].find(app) != getStreamCenter().streamCenter[vhost].end()) {
+			    if (getStreamCenter().streamCenter[vhost][app].find(streamName) != getStreamCenter().streamCenter[vhost][app].end()) {
+				    stream = getStreamCenter().streamCenter[vhost][app][streamName];
+			    }
+		    }
+	    }
+	    getStreamCenter().rwLock.unlock();
     }
     return stream;
 }
