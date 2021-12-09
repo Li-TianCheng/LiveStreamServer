@@ -25,13 +25,14 @@ public:
     ~SessionBase() override = default;
 protected:
     void parseTag();
-    void flvToRtmp(shared_ptr<vector<unsigned char>> temTag, shared_ptr<vector<unsigned char>> tag);
+    void flvToRtmp(Buffer& temTag, Buffer& tag);
 protected:
     bool isRtmp;
     bool isSource;
     bool isAVC;
     bool isAAC;
 	bool isRelay;
+	bool isAddSink;
     int count;
     int lastCount;
     int currNum;
@@ -45,8 +46,8 @@ protected:
     Stream stream;
 	shared_ptr<Time> time;
     weak_ptr<SessionBase> sourceSession;
-    shared_ptr<vector<unsigned char>> flvTemTag;
-    shared_ptr<vector<unsigned char>> rtmpTemTag;
+	Buffer flvTemTag;
+	Buffer rtmpTemTag;
     unordered_set<shared_ptr<SessionBase>> waitPlay;
     unordered_set<shared_ptr<SessionBase>> sinkManager;
     RwLock rwLock;

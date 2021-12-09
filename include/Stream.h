@@ -13,18 +13,12 @@ using std::string;
 using std::vector;
 
 struct Stream {
-    shared_ptr<vector<unsigned char>> currTag;
-    shared_ptr<vector<unsigned char>> script;
-    shared_ptr<vector<unsigned char>> avcTag;
-    shared_ptr<vector<unsigned char>> aacTag;
-    vector<shared_ptr<vector<unsigned char>>> gop;
-    int idx;
-    Stream(): idx(0) {
-        currTag = ObjPool::allocate<vector<unsigned char>>();
-        script = ObjPool::allocate<vector<unsigned char>>();
-        avcTag = ObjPool::allocate<vector<unsigned char>>();
-        aacTag = ObjPool::allocate<vector<unsigned char>>();
-    }
+    Buffer currTag;
+	Buffer script;
+	Buffer avcTag;
+	Buffer aacTag;
+    vector<Buffer> gop;
+    int idx = 0;
 };
 
 

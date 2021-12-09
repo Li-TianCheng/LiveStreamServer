@@ -243,17 +243,17 @@ void HttpFlvSession::parseFlv(iter &pos) {
             }
             case 2: {
                 if (size == 0) {
-                    stream.currTag->push_back(typeId);
-                    stream.currTag->push_back((flvSize>>16) & 0x0000ff);
-                    stream.currTag->push_back((flvSize>>8) & 0x0000ff);
-                    stream.currTag->push_back(flvSize & 0x0000ff);
+                    stream.currTag.push_back(typeId);
+                    stream.currTag.push_back((flvSize>>16) & 0x0000ff);
+                    stream.currTag.push_back((flvSize>>8) & 0x0000ff);
+                    stream.currTag.push_back(flvSize & 0x0000ff);
                 }
                 size_t remain = msgLength-idx;
                 if (chunked) {
                     remain = chunkSize < msgLength-idx ? chunkSize : msgLength-idx;
                 }
                 size_t inc = remain < flvSize-size+11 ? remain : flvSize-size+11;
-                copy(pos+idx, inc, *stream.currTag);
+				copy(pos+idx, inc, stream.currTag);
                 idx += inc;
                 size += inc;
                 if (chunked) {

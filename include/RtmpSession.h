@@ -38,6 +38,11 @@ protected:
     void ack();
     void parseControlMsg();
     void writeChunk(ChunkStreamHead& head, shared_ptr<vector<unsigned char>> msg);
+	void phase0(iter& pos);
+	void phase1(iter& pos);
+	void phase2(iter& pos);
+	void phase3(iter& pos);
+	void phase4(iter& pos);
 protected:
     int size;
     int status;
@@ -57,6 +62,8 @@ protected:
     unsigned int time;
     bool extend;
     unordered_map<unsigned int, ChunkStreamHead> chunkMap;
+	ChunkStreamHead videoHead;
+	ChunkStreamHead audioHead;
     ChunkStreamHead* head;
     shared_ptr<vector<unsigned char>> c1;
     vector<unsigned char> cmd;

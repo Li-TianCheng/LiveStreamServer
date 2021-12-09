@@ -8,6 +8,8 @@ RtmpSession::RtmpSession(int bufferChunkSize): status(0), size(1536), chunkStatu
                                   remoteChunkSize(128), remoteWindowAckSize(2500000), chunkSize(128), windowAckSize(2500000),
                                   received(0), ackReceived(0), SessionBase(true, bufferChunkSize), extend(false) {
     c1->reserve(1536);
+	audioHead.csId = 4;
+	videoHead.csId = 6;
 }
 
 void RtmpSession::handleReadDone(iter pos, size_t n) {
@@ -61,197 +63,23 @@ void RtmpSession::shakeHand(iter& pos) {
 void RtmpSession::parseHead(iter& pos) {
     switch (chunkStatus) {
         case 0: {
-            unsigned char c = *(pos+idx);
-            fmt = c >> 6;
-            csId = c & 0x3f;
-            if (fmt == 0) {
-                msgHeaderSize = 11;
-            } else if (fmt == 1) {
-                msgHeaderSize = 7;
-            } else if (fmt == 2) {
-                msgHeaderSize = 3;
-            } else {
-                msgHeaderSize = 0;
-            }
-            if (csId == 0) {
-                csId = 0;
-                basicHeaderSize = 1;
-            } else if (csId == 1) {
-                csId = 0;
-                basicHeaderSize = 2;
-            } else {
-                head = &chunkMap[csId];
-                head->csId = csId;
-                basicHeaderSize = 0;
-            }
-            if (msgHeaderSize == 0) {
-                if (basicHeaderSize != 0) {
-                    size = 0;
-                    chunkStatus = 1;
-                } else {
-                    if (extend) {
-                        size = 0;
-                        chunkStatus = 3;
-                    } else {
-                        size = 0;
-                        chunkStatus = 4;
-                    }
-                }
-            } else {
-                if (basicHeaderSize == 0) {
-                    size = 0;
-                    chunkStatus = 2;
-                } else {
-                    size = 0;
-                    chunkStatus = 1;
-                }
-            }
-            idx++;
+	        phase0(pos);
             break;
         }
         case 1: {
-            unsigned char c = *(pos+idx);
-            size++;
-            csId = (csId << 8) | ((unsigned char)c);
-            if (size == basicHeaderSize) {
-                csId += 64;
-                head = &chunkMap[csId];
-                head->csId = csId;
-                if (msgHeaderSize == 0) {
-                    if (extend) {
-                        size = 0;
-                        chunkStatus = 3;
-                    } else {
-                        size = 0;
-                        chunkStatus = 4;
-                    }
-                } else {
-                    size = 0;
-                    chunkStatus = 2;
-                }
-            }
-            idx++;
+	        phase1(pos);
             break;
         }
         case 2: {
-            unsigned char c = *(pos+idx);
-            size++;
-            if (size == 1) {
-                time = 0;
-                if (fmt == 0) {
-                    head->time = 0;
-                    head->timeDelta = 0;
-                    head->length = 0;
-                    head->streamId = 0;
-                }
-                if (fmt == 1) {
-                    head->timeDelta = 0;
-                    head->length = 0;
-                }
-                if (fmt == 2) {
-                    head->timeDelta = 0;
-                }
-            }
-            if (size <= 3) {
-                time = (time << 8) | ((unsigned char)c);
-                if (size == 3) {
-                    if (time == 0xffffff) {
-                        extend = true;
-                        time = 0;
-                    } else {
-                        extend = false;
-                        if (fmt == 0) {
-                            head->time = time;
-                        } else {
-                            head->timeDelta = time;
-                        }
-                    }
-                }
-            } else if (size <= 6) {
-                head->length = (head->length << 8) | ((unsigned char)c);
-            } else if (size <= 7) {
-                head->typeId = (unsigned char)c;
-            } else if (size <= 11) {
-                head->streamId = head->streamId | ((unsigned int)c << (8*(size-8)));
-            }
-            if (size == msgHeaderSize) {
-                if (extend) {
-                    size = 0;
-                    chunkStatus = 3;
-                } else {
-                    size = 0;
-                    chunkStatus = 4;
-                }
-            }
-            idx++;
+	        phase2(pos);
             break;
         }
         case 3: {
-            unsigned char c = *(pos+idx);
-            size++;
-            time = (time << 8) | ((unsigned char)c);
-            if (size == 4) {
-                if (fmt == 0) {
-                    head->time = time;
-                } else {
-                    head->timeDelta = time;
-                }
-                size = 0;
-                chunkStatus = 4;
-                extend = false;
-            }
-            idx++;
+	        phase3(pos);
             break;
         }
         case 4: {
-            size_t remain = head->length-head->idx < remoteChunkSize-size ? head->length-head->idx : remoteChunkSize-size;
-            size_t inc = remain < msgLength-idx ? remain : msgLength-idx;
-            if (head->idx == 0) {
-                head->time += head->timeDelta;
-            }
-            if (head->typeId == 1 || head->typeId == 5 || head->typeId == 17 || head->typeId == 20) {
-                copy(pos+idx, inc, cmd);
-            } else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
-                if (head->idx == 0) {
-                    stream.currTag->push_back(head->typeId);
-                    stream.currTag->push_back((head->length >> 16) & 0x0000ff);
-                    stream.currTag->push_back((head->length >> 8) & 0x0000ff);
-                    stream.currTag->push_back(head->length & 0x0000ff);
-                    stream.currTag->push_back((head->time >> 16) & 0x000000ff);
-                    stream.currTag->push_back((head->time >> 8) & 0x000000ff);
-                    stream.currTag->push_back(head->time & 0x000000ff);
-                    stream.currTag->push_back((head->time >> 24) & 0x000000ff);
-                    stream.currTag->push_back(0);
-                    stream.currTag->push_back(0);
-                    stream.currTag->push_back(0);
-                }
-                copy(pos+idx, inc, *stream.currTag);
-            }
-            size += inc;
-            head->idx += inc;
-            idx += inc;
-            if (head->idx == head->length) {
-                ack();
-                if (head->typeId == 1 || head->typeId == 5) {
-                    parseControlMsg();
-                    cmd.clear();
-                } else if (head->typeId == 17 || head->typeId == 20) {
-                    parseCmdMsg();
-                    cmd.clear();
-                } else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
-                    stream.currTag->push_back(((head->length+11)  >> 24) & 0x000000ff);
-                    stream.currTag->push_back(((head->length+11)  >> 16) & 0x000000ff);
-                    stream.currTag->push_back(((head->length+11)  >> 8) & 0x000000ff);
-                    stream.currTag->push_back((head->length+11) & 0x000000ff);
-                    parseTag();
-                }
-                head->idx = 0;
-                size = 0;
-                chunkStatus = 0;
-            } else if (size == remoteChunkSize) {
-                size = 0;
-                chunkStatus = 0;
-            }
+	        phase4(pos);
             break;
         }
         default: break;
@@ -304,10 +132,11 @@ void RtmpSession::ack() {
         head.csId = 2;
         head.typeId = 3;
         auto msg = ObjPool::allocate<vector<unsigned char>>();
-        msg->push_back((chunkSize >> 24) & 0x000000ff);
-        msg->push_back((chunkSize >> 16) & 0x000000ff);
-        msg->push_back((chunkSize >> 8) & 0x000000ff);
-        msg->push_back(chunkSize & 0x000000ff);
+		const unsigned char tmp[] = {(unsigned char)((chunkSize >> 24) & 0x000000ff),
+		                       (unsigned char)((chunkSize >> 16) & 0x000000ff),
+		                       (unsigned char)((chunkSize >> 8) & 0x000000ff),
+		                       (unsigned char)(chunkSize & 0x000000ff)};
+		msg->insert(msg->end(), tmp, tmp+sizeof(tmp));
         writeChunk(head, msg);
         ackReceived = 0;
     }
@@ -403,18 +232,19 @@ void RtmpSession::writeChunk(ChunkStreamHead &head, shared_ptr<vector<unsigned c
             break;
         }
         if (i == 0) {
-            chunk->push_back(head.csId);
-            chunk->push_back((head.time >> 16) & 0x0000ff);
-            chunk->push_back((head.time >> 8) & 0x0000ff);
-            chunk->push_back(head.time & 0x0000ff);
-            chunk->push_back((head.length >> 16) & 0x0000ff);
-            chunk->push_back((head.length >> 8) & 0x0000ff);
-            chunk->push_back(head.length & 0x0000ff);
-            chunk->push_back(head.typeId);
-            chunk->push_back(head.streamId & 0x000000ff);
-            chunk->push_back((head.streamId >> 8) & 0x000000ff);
-            chunk->push_back((head.streamId >> 16) & 0x000000ff);
-            chunk->push_back((head.streamId >> 24) & 0x000000ff);
+	        const unsigned char tmp[] = {(unsigned char)head.csId,
+			                       (unsigned char)((head.time >> 16) & 0x0000ff),
+			                       (unsigned char)((head.time >> 8) & 0x0000ff),
+			                       (unsigned char)(head.time & 0x0000ff),
+			                       (unsigned char)((head.length >> 16) & 0x0000ff),
+			                       (unsigned char)((head.length >> 8) & 0x0000ff),
+			                       (unsigned char)(head.length & 0x0000ff),
+			                       (unsigned char)head.typeId,
+			                       (unsigned char)(head.streamId & 0x000000ff),
+			                       (unsigned char)((head.streamId >> 8) & 0x000000ff),
+			                       (unsigned char)((head.streamId >> 16) & 0x000000ff),
+			                       (unsigned char)((head.streamId >> 24) & 0x000000ff)};
+			chunk->insert(chunk->end(), tmp, tmp+sizeof(tmp));
         } else {
             chunk->push_back(head.csId | 0xc0);
         }
@@ -434,21 +264,22 @@ void RtmpSession::responseConnect(vector<string> &type, vector<string> &value) {
     windowAckHead.csId = 2;
     windowAckHead.typeId = 5;
     shared_ptr<vector<unsigned char>> windowAckMsg = ObjPool::allocate<vector<unsigned char>>();
-    windowAckMsg->push_back((windowAckSize >> 24) & 0x000000ff);
-    windowAckMsg->push_back((windowAckSize >> 16) & 0x000000ff);
-    windowAckMsg->push_back((windowAckSize >> 8) & 0x000000ff);
-    windowAckMsg->push_back(windowAckSize & 0x000000ff);
+	const unsigned char tmp1[] = {(unsigned char)((windowAckSize >> 24) & 0x000000ff),
+	                       (unsigned char)((windowAckSize >> 16) & 0x000000ff),
+	                       (unsigned char)((windowAckSize >> 8) & 0x000000ff),
+	                       (unsigned char)(windowAckSize & 0x000000ff)};
+	windowAckMsg->insert(windowAckMsg->end(), tmp1, tmp1+sizeof(tmp1));
     writeChunk(windowAckHead, windowAckMsg);
 
     ChunkStreamHead setPeerBandWidthHead;
     setPeerBandWidthHead.csId = 2;
     setPeerBandWidthHead.typeId = 6;
     shared_ptr<vector<unsigned char>> setPeerBandWidthMsg = ObjPool::allocate<vector<unsigned char>>();
-    setPeerBandWidthMsg->push_back((2500000 >> 24) & 0x000000ff);
-    setPeerBandWidthMsg->push_back((2500000 >> 16) & 0x000000ff);
-    setPeerBandWidthMsg->push_back((2500000 >> 8) & 0x000000ff);
-    setPeerBandWidthMsg->push_back(2500000 & 0x000000ff);
-    setPeerBandWidthMsg->push_back(2);
+	const unsigned char tmp2[] = {(2500000 >> 24) & 0x000000ff,
+							(2500000 >> 16) & 0x000000ff,
+							(2500000 >> 8) & 0x000000ff,
+							2500000 & 0x000000ff, 2};
+	setPeerBandWidthMsg->insert(setPeerBandWidthMsg->end(), tmp2, tmp2+sizeof(tmp2));
     writeChunk(setPeerBandWidthHead, setPeerBandWidthMsg);
 
     chunkSize = ConfigSystem::getConfig()["live_stream_server"]["rtmp_chunk_size"].asInt();
@@ -456,10 +287,11 @@ void RtmpSession::responseConnect(vector<string> &type, vector<string> &value) {
     setChunkSizeHead.csId = 2;
     setChunkSizeHead.typeId = 1;
     shared_ptr<vector<unsigned char>> setChunkSizeMsg = ObjPool::allocate<vector<unsigned char>>();
-    setChunkSizeMsg->push_back((chunkSize >> 24) & 0x000000ff);
-    setChunkSizeMsg->push_back((chunkSize >> 16) & 0x000000ff);
-    setChunkSizeMsg->push_back((chunkSize >> 8) & 0x000000ff);
-    setChunkSizeMsg->push_back(chunkSize & 0x000000ff);
+	const unsigned char tmp3[] = {(unsigned char)((chunkSize >> 24) & 0x000000ff),
+	                        (unsigned char)((chunkSize >> 16) & 0x000000ff),
+	                        (unsigned char)((chunkSize >> 8) & 0x000000ff),
+	                        (unsigned char)(chunkSize & 0x000000ff)};
+	setChunkSizeMsg->insert(setChunkSizeMsg->end(), tmp3, tmp3+sizeof(tmp3));
     writeChunk(setChunkSizeHead, setChunkSizeMsg);
 
     ChunkStreamHead resp;
@@ -477,9 +309,8 @@ void RtmpSession::responseConnect(vector<string> &type, vector<string> &value) {
     writeAMF0String(respMsg, "FMS/3,0,1,123");
     writeAMF0Key(respMsg, "capabilities");
     writeAMF0Num(respMsg, 31);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(9);
+	const unsigned char tmp[] = {0, 0, 9};
+	respMsg->insert(respMsg->end(), tmp, tmp+sizeof(tmp));
 
     respMsg->push_back(3);
     writeAMF0Key(respMsg, "level");
@@ -490,9 +321,7 @@ void RtmpSession::responseConnect(vector<string> &type, vector<string> &value) {
     writeAMF0String(respMsg, "Connection succeeded.");
     writeAMF0Key(respMsg, "objectEncoding");
     writeAMF0Num(respMsg, 0);
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(9);
+	respMsg->insert(respMsg->end(), tmp, tmp+sizeof(tmp));
     writeChunk(resp, respMsg);
 }
 
@@ -530,9 +359,8 @@ void RtmpSession::responsePublish(vector<string> &type, vector<string> &value) {
     writeAMF0String(respMsg, "NetStream.Publish.Start");
     writeAMF0Key(respMsg, "description");
     writeAMF0String(respMsg, "Start publishing.");
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(9);
+	const unsigned char tmp[] = {0, 0, 9};
+	respMsg->insert(respMsg->end(), tmp, tmp+sizeof(tmp));
     writeChunk(resp, respMsg);
 }
 
@@ -554,9 +382,8 @@ void RtmpSession::responsePlay(vector<string> &type, vector<string> &value) {
     writeAMF0String(respMsg, "NetStream.Play.Reset");
     writeAMF0Key(respMsg, "description");
     writeAMF0String(respMsg, "Playing and resetting stream.");
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(9);
+	const unsigned char tmp[] = {0, 0, 9};
+	respMsg->insert(respMsg->end(), tmp, tmp+sizeof(tmp));
     writeChunk(resp, respMsg);
 
     respMsg = ObjPool::allocate<vector<unsigned char>>();
@@ -572,9 +399,7 @@ void RtmpSession::responsePlay(vector<string> &type, vector<string> &value) {
     writeAMF0String(respMsg, "NetStream.Play.Start");
     writeAMF0Key(respMsg, "description");
     writeAMF0String(respMsg, "Started playing stream.");
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(9);
+	respMsg->insert(respMsg->end(), tmp, tmp+sizeof(tmp));
     writeChunk(resp, respMsg);
 
     respMsg = ObjPool::allocate<vector<unsigned char>>();
@@ -590,9 +415,7 @@ void RtmpSession::responsePlay(vector<string> &type, vector<string> &value) {
     writeAMF0String(respMsg, "NetStream.Data.Start");
     writeAMF0Key(respMsg, "description");
     writeAMF0String(respMsg, "Started playing stream.");
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(9);
+	respMsg->insert(respMsg->end(), tmp, tmp+sizeof(tmp));
     writeChunk(resp, respMsg);
 
     respMsg = ObjPool::allocate<vector<unsigned char>>();
@@ -608,34 +431,270 @@ void RtmpSession::responsePlay(vector<string> &type, vector<string> &value) {
     writeAMF0String(respMsg, "NetStream.Play.PublishNotify");
     writeAMF0Key(respMsg, "description");
     writeAMF0String(respMsg, "Started playing notify.");
-    respMsg->push_back(0);
-    respMsg->push_back(0);
-    respMsg->push_back(9);
+	respMsg->insert(respMsg->end(), tmp, tmp+sizeof(tmp));
     writeChunk(resp, respMsg);
 }
 
 void RtmpSession::writeAMF0Num(shared_ptr<vector<unsigned char>> chunk, double num) {
-    chunk->push_back(0);
-    unsigned long l = *(unsigned long*)&(num);
-    chunk->push_back((l >> 56) & 0x00000000000000ff);
-    chunk->push_back((l >> 48) & 0x00000000000000ff);
-    chunk->push_back((l >> 40) & 0x00000000000000ff);
-    chunk->push_back((l >> 32) & 0x00000000000000ff);
-    chunk->push_back((l >> 24) & 0x00000000000000ff);
-    chunk->push_back((l >> 16) & 0x00000000000000ff);
-    chunk->push_back((l >> 8) & 0x00000000000000ff);
-    chunk->push_back(l & 0x00000000000000ff);
+	unsigned long l = *(unsigned long*)&(num);
+	const unsigned char tmp[] = {0,
+						   (unsigned char)((l >> 56) & 0x00000000000000ff),
+						   (unsigned char)((l >> 48) & 0x00000000000000ff),
+						   (unsigned char)((l >> 40) & 0x00000000000000ff),
+						   (unsigned char)((l >> 32) & 0x00000000000000ff),
+						   (unsigned char)((l >> 24) & 0x00000000000000ff),
+						   (unsigned char)((l >> 16) & 0x00000000000000ff),
+						   (unsigned char)((l >> 8) & 0x00000000000000ff),
+						   (unsigned char)(l & 0x00000000000000ff)};
+	chunk->insert(chunk->end(), tmp, tmp+sizeof(tmp));
 }
 
 void RtmpSession::writeAMF0String(shared_ptr<vector<unsigned char>> chunk, const string& str) {
-    chunk->push_back(2);
-    chunk->push_back((str.size() >> 8) & 0x00ff);
-    chunk->push_back(str.size() & 0x00ff);
+	const unsigned char tmp[] = {2, (unsigned char)((str.size() >> 8) & 0x00ff), (unsigned char)(str.size() & 0x00ff)};
+	chunk->insert(chunk->end(), tmp, tmp+sizeof(tmp));
     chunk->insert(chunk->end(), str.begin(), str.end());
 }
 
 void RtmpSession::writeAMF0Key(shared_ptr<vector<unsigned char>> chunk, const string &str) {
-    chunk->push_back((str.size() >> 8) & 0x00ff);
-    chunk->push_back(str.size() & 0x00ff);
+	const unsigned char tmp[] = {(unsigned char)((str.size() >> 8) & 0x00ff), (unsigned char)(str.size()& 0x00ff)};
+	chunk->insert(chunk->end(), tmp, tmp+sizeof(tmp));
     chunk->insert(chunk->end(), str.begin(), str.end());
+}
+
+void RtmpSession::phase0(iter& pos) {
+	unsigned char c = *(pos+idx);
+	fmt = c >> 6;
+	csId = c & 0x3f;
+	switch(fmt) {
+		case 0: {
+			msgHeaderSize = 11;
+			break;
+		}
+		case 1: {
+			msgHeaderSize = 7;
+			break;
+		}
+		case 2: {
+			msgHeaderSize = 3;
+			break;
+		}
+		default: {
+			msgHeaderSize = 0;
+			break;
+		}
+	}
+	switch(csId) {
+		case 0: {
+			basicHeaderSize = 1;
+			break;
+		}
+		case 1: {
+			csId = 0;
+			basicHeaderSize = 2;
+			break;
+		}
+		case 4: {
+			head = &audioHead;
+			basicHeaderSize = 0;
+			break;
+		}
+		case 6: {
+			head = &videoHead;
+			basicHeaderSize = 0;
+			break;
+		}
+		default: {
+			if (chunkMap.find(csId) == chunkMap.end()) {
+				chunkMap[csId].csId = csId;
+			}
+			head = &chunkMap[csId];
+			basicHeaderSize = 0;
+			break;
+		}
+	}
+	size = 0;
+	if (basicHeaderSize != 0) {
+		chunkStatus = 1;
+	} else {
+		if (msgHeaderSize == 0) {
+			if (extend) {
+				chunkStatus = 3;
+			} else {
+				chunkStatus = 4;
+			}
+		} else {
+			chunkStatus = 2;
+		}
+	}
+	idx++;
+}
+
+void RtmpSession::phase1(iter& pos) {
+	unsigned char c = *(pos+idx);
+	size++;
+	csId = (csId << 8) | ((unsigned char)c);
+	if (size == basicHeaderSize) {
+		csId += 64;
+		switch(csId) {
+			case 4: {
+				head = &audioHead;
+				break;
+			}
+			case 6: {
+				head = &videoHead;
+				break;
+			}
+			default: {
+				if (chunkMap.find(csId) == chunkMap.end()) {
+					chunkMap[csId].csId = csId;
+				}
+				head = &chunkMap[csId];
+				break;
+			}
+		}
+		if (msgHeaderSize == 0) {
+			if (extend) {
+				size = 0;
+				chunkStatus = 3;
+			} else {
+				size = 0;
+				chunkStatus = 4;
+			}
+		} else {
+			size = 0;
+			chunkStatus = 2;
+		}
+	}
+	idx++;
+}
+
+void RtmpSession::phase2(iter& pos) {
+	unsigned char c = *(pos+idx);
+	size++;
+	if (size == 1) {
+		time = 0;
+		switch (fmt) {
+			case 0: {
+				head->time = 0;
+				head->timeDelta = 0;
+				head->length = 0;
+				head->streamId = 0;
+				break;
+			}
+			case 1: {
+				head->timeDelta = 0;
+				head->length = 0;
+				break;
+			}
+			case 2: {
+				head->timeDelta = 0;
+				break;
+			}
+		}
+	}
+	switch (size) {
+		case 0 ...3: {
+			time = (time << 8) | ((unsigned char)c);
+			if (size == 3) {
+				if (time == 0xffffff) {
+					extend = true;
+					time = 0;
+				} else {
+					extend = false;
+					if (fmt == 0) {
+						head->time = time;
+					} else {
+						head->timeDelta = time;
+					}
+				}
+			}
+			break;
+		}
+		case 4 ...6: {
+			head->length = (head->length << 8) | ((unsigned char)c);
+			break;
+		}
+		case 7: {
+			head->typeId = (unsigned char)c;
+			break;
+		}
+		case 8 ...11: {
+			head->streamId = head->streamId | ((unsigned int)c << (8*(size-8)));
+			break;
+		}
+	}
+	if (size == msgHeaderSize) {
+		if (extend) {
+			size = 0;
+			chunkStatus = 3;
+		} else {
+			size = 0;
+			chunkStatus = 4;
+		}
+	}
+	idx++;
+}
+
+void RtmpSession::phase3(iter& pos) {
+	unsigned char c = *(pos+idx);
+	size++;
+	time = (time << 8) | ((unsigned char)c);
+	if (size == 4) {
+		if (fmt == 0) {
+			head->time = time;
+		} else {
+			head->timeDelta = time;
+		}
+		size = 0;
+		chunkStatus = 4;
+		extend = false;
+	}
+	idx++;
+}
+
+void RtmpSession::phase4(iter& pos) {
+	size_t remain = head->length-head->idx < remoteChunkSize-size ? head->length-head->idx : remoteChunkSize-size;
+	size_t inc = remain < msgLength-idx ? remain : msgLength-idx;
+	if (head->idx == 0) {
+		head->time += head->timeDelta;
+	}
+	if (head->typeId == 1 || head->typeId == 5 || head->typeId == 17 || head->typeId == 20) {
+		copy(pos+idx, inc, cmd);
+	} else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
+		if (head->idx == 0) {
+			const unsigned char tmp[] = {(unsigned char)head->typeId, (unsigned char)((head->length >> 16) & 0x0000ff),
+			                       (unsigned char)((head->length >> 8) & 0x0000ff), (unsigned char)(head->length & 0x0000ff),
+			                       (unsigned char)((head->time >> 16) & 0x000000ff), (unsigned char)((head->time >> 8) & 0x000000ff),
+			                       (unsigned char)(head->time & 0x000000ff), (unsigned char)((head->time >> 24) & 0x000000ff),
+			                       0, 0, 0};
+			stream.currTag.insert(tmp, sizeof(tmp));
+		}
+		copy(pos+idx, inc, stream.currTag);
+	}
+	size += inc;
+	head->idx += inc;
+	idx += inc;
+	if (head->idx == head->length) {
+		ack();
+		if (head->typeId == 1 || head->typeId == 5) {
+			parseControlMsg();
+			cmd.clear();
+		} else if (head->typeId == 17 || head->typeId == 20) {
+			parseCmdMsg();
+			cmd.clear();
+		} else if (head->typeId == 8 || head->typeId == 9 || head->typeId == 18) {
+			const unsigned char tmp[] = {(unsigned char)(((head->length+11) >> 24) & 0x000000ff),
+			                       (unsigned char)(((head->length+11) >> 16) & 0x000000ff),
+			                       (unsigned char)(((head->length+11) >> 8) & 0x000000ff),
+			                       (unsigned char)((head->length+11) & 0x000000ff)};
+			stream.currTag.insert(tmp, sizeof(tmp));
+			parseTag();
+		}
+		head->idx = 0;
+		size = 0;
+		chunkStatus = 0;
+	} else if (size == remoteChunkSize) {
+		size = 0;
+		chunkStatus = 0;
+	}
 }
