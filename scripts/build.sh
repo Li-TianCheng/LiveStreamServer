@@ -7,7 +7,9 @@ fi
 mkdir ../output
 mkdir ../output/bin
 mkdir ../output/config
+mkdir ../output/log
 cp ../config/config.json ../output/config
+cp -r ../resource ../output
 
 if [ -d "../tmp/" ];then
   rm -r ../tmp
