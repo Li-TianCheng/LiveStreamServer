@@ -7,6 +7,7 @@
 
 #include <sstream>
 #include "my_pthread/include/RwLock.h"
+#include "my_pthread/include/SpinLock.h"
 #include "net/include/TcpSession.h"
 #include "net/include/Ping.h"
 #include "Stream.h"
@@ -51,7 +52,7 @@ protected:
     unordered_set<shared_ptr<SessionBase>> waitPlay;
     unordered_set<shared_ptr<SessionBase>> sinkManager;
     RwLock rwLock;
-    Mutex mutex;
+    SpinLock lock;
 };
 
 

@@ -84,9 +84,9 @@ void SessionBase::addSink() {
     if (session != nullptr) {
 	    isAddSink = true;
         StreamCenter::updateSinkNum(1);
-	    session->mutex.lock();
+	    session->lock.lock();
 	    session->waitPlay.insert(static_pointer_cast<SessionBase>(shared_from_this()));
-	    session->mutex.unlock();
+	    session->lock.unlock();
     }
 }
 
@@ -106,9 +106,9 @@ void SessionBase::sessionClear() {
 		}
 	    auto session = sourceSession.lock();
         if (session != nullptr) {
-	        session->mutex.lock();
+	        session->lock.lock();
 	        session->waitPlay.erase(static_pointer_cast<SessionBase>(shared_from_this()));
-	        session->mutex.unlock();
+	        session->lock.unlock();
 	        session->rwLock.wrLock();
 	        session->sinkManager.erase(static_pointer_cast<SessionBase>(shared_from_this()));
 	        session->rwLock.unlock();
@@ -202,7 +202,7 @@ void SessionBase::writeRtmpHead() {
 
 void SessionBase::handleReadDone(iter pos, size_t n) {
     if (!waitPlay.empty()) {
-        mutex.lock();
+        lock.lock();
         for (auto& session : waitPlay) {
             if (session->isRtmp) {
                 session->writeRtmpHead();
@@ -217,6 +217,6 @@ void SessionBase::handleReadDone(iter pos, size_t n) {
             rwLock.unlock();
         }
         waitPlay.clear();
-        mutex.unlock();
+        lock.unlock();
     }
 }

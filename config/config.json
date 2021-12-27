@@ -19,8 +19,8 @@
     "task_system": {
       "init_thread_num": 10,
       "max_thread_num": 30,
-      "increase_task_num": 10,
-      "check_time": [0, 0, 1, 0]
+      "increase_task_num": 5000,
+      "check_time": [0, 1, 0, 0]
     },
     "log": {
       "path": "../log/log.log",
