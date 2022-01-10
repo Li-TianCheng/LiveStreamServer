@@ -7,20 +7,20 @@
 
 #include "SessionBase.h"
 
-struct ChunkStreamHead {
-    unsigned int csId = 0;
-    unsigned int time = 0;
-    unsigned int timeDelta = 0;
-    unsigned int streamId = 0;
-    unsigned int typeId = 0;
-    unsigned int length = 0;
-    unsigned int idx = 0;
-};
-
 class RtmpSession: public SessionBase {
 public:
     explicit RtmpSession(int bufferChunkSize);
     ~RtmpSession() override = default;
+protected:
+	struct ChunkStreamHead {
+		unsigned int csId = 0;
+		unsigned int time = 0;
+		unsigned int timeDelta = 0;
+		unsigned int streamId = 0;
+		unsigned int typeId = 0;
+		unsigned int length = 0;
+		unsigned int idx = 0;
+	};
 protected:
     void handleReadDone(iter pos, size_t n) override;
     virtual void shakeHand(iter& pos);

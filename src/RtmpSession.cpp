@@ -91,6 +91,9 @@ void RtmpSession::parseCmdMsg() {
     vector<string> value;
     if (head->typeId == 20) {
         parseAMF0(type, value);
+		if (value.empty()) {
+			return;
+		}
         if (value[0] == "connect") {
             vector<string> split = utils::split(value[3], '/', 2);
             if (split.size() == 2) {
@@ -209,6 +212,7 @@ OBJ:            if (cmd[i] == 0 && cmd[i+1] == 0 && cmd[i+2] == 9) {
                 i += 2 + length;
                 break;
             }
+			default: return;
         }
     }
 }

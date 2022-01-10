@@ -91,7 +91,7 @@ void SessionBase::addSink() {
 }
 
 void SessionBase::sessionInit() {
-    time = addTicker(0, 0, 1, 0);
+    time = addTicker(0, 0, 10, 0);
 }
 
 void SessionBase::sessionClear() {
